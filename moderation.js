@@ -3,21 +3,24 @@ const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.3-70b-versatile'; // modelo gratuito da Groq, bom pra classificação
 
 /**
- * Analisa uma mensagem e decide se o COGB da pessoa deve subir, descer ou ficar igual.
- * Retorna { acao: 'violacao' | 'elogio' | 'neutro', delta: number, motivo: string }
+ * Analisa uma mensagem e decide se o COGB da pessoa deve subir.
+ * Retorna { acao: 'violacao' | 'neutro', delta: number, motivo: string }
  */
 async function analisarMensagem(texto) {
-  const systemPrompt = `Você modera um grupo de WhatsApp. Analise a mensagem do usuário e classifique-a.
+  const systemPrompt = `Você modera um grupo de WhatsApp que usa um bot chamado COGB (chances de banimento).
 
 Responda APENAS em JSON puro, sem markdown, sem explicações fora do JSON, no formato:
-{"acao": "violacao" | "elogio" | "neutro", "intensidade": 1 a 10, "motivo": "breve explicação em português"}
+{"acao": "violacao" | "neutro", "intensidade": 1 a 10, "motivo": "breve explicação em português"}
 
 Regras:
-- "violacao": a mensagem desrespeita, xinga, ofende, ameaça ou é agressiva com alguém do grupo.
-- "elogio": a mensagem demonstra ótimo comportamento, gentileza, ajuda ao próximo ou reconhecimento de erro passado.
-- "neutro": conversa normal, sem nada de especial.
-- "intensidade" mede o quão forte foi a violação ou o quão bom foi o comportamento (1 = leve, 10 = extremo).
-- Seja bem conservador: na dúvida, classifique como "neutro". Brincadeiras leves entre amigos geralmente são "neutro".`;
+- "violacao": a mensagem contém xingamento, ofensa, ameaça ou agressão CLARA e direta contra alguém do grupo.
+- "neutro": qualquer outra coisa — inclui conversa normal, brincadeiras leves entre amigos, sarcasmo sem alvo,
+  desculpas ou autocrítica (ex: "desculpa por xingar ontem"), e qualquer comentário sobre o próprio bot/COGB
+  ou suas configurações (ex: "esse bot tira meu COGB à toa", "vou atualizar as regras dele").
+- "intensidade" mede o quão grave foi a violação (1 = leve, 10 = extremo). Só relevante se "acao" for "violacao".
+- Seja MUITO conservador: na dúvida, classifique como "neutro". Só marque como violação se não houver
+  nenhuma outra leitura razoável da mensagem. Uma pessoa comentando sobre o próprio comportamento passado,
+  se desculpando, ou falando do bot NUNCA deve ser tratada como uma nova violação.`;
 
   try {
     const response = await fetch(API_URL, {
@@ -58,16 +61,10 @@ Regras:
 
 // Converte a classificação da IA num valor de delta pro COGB
 function converterParaDelta(resultado) {
-  const intensidade = Math.min(10, Math.max(1, resultado.intensidade || 1));
-
   if (resultado.acao === 'violacao') {
+    const intensidade = Math.min(10, Math.max(1, resultado.intensidade || 1));
     // violação leve soma pouco, violação grave soma bastante (até +25)
     return { acao: 'violacao', delta: intensidade * 2.5, motivo: resultado.motivo };
-  }
-
-  if (resultado.acao === 'elogio') {
-    // bom comportamento reduz o COGB (até -15)
-    return { acao: 'elogio', delta: -(intensidade * 1.5), motivo: resultado.motivo };
   }
 
   return { acao: 'neutro', delta: 0, motivo: resultado.motivo || '' };
