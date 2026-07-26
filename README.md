@@ -1,16 +1,16 @@
-# Bot de WhatsApp com COGB 🤖📊
+# Bot de WhatsApp conversador 🤖💬
 
-Bot que atua em grupos de WhatsApp e mantém um "COGB" (chances de banimento) automático
-para cada membro, usando IA para analisar o comportamento nas mensagens.
+Bot que participa de grupos de WhatsApp como se fosse mais um amigo — usa gírias, faz piadas,
+conversa de boa. Só entra na conversa quando é chamado (@mencionado), e "sai" sozinho depois
+de 20 segundos sem ninguém falar, voltando a ficar quieto até ser chamado de novo.
 
 ## O que ele faz
 
-- Fica de olho nas mensagens do grupo.
-- Quando alguém desrespeita, xinga ou ofende: o COGB da pessoa **sobe**.
-- Quando alguém tem um ótimo comportamento (ajuda, é gentil, se desculpa): o COGB **desce**.
-- Quando alguém digita `/Cogb` no grupo: o bot responde com a lista de todo mundo e a
-  porcentagem de cada um.
-- Se o COGB de alguém chegar a 100%, o bot manda um aviso automático pro admin no privado.
+- Fica quieto no grupo até alguém **marcar ele** (@) numa mensagem.
+- Quando marcado, começa a responder normalmente, de forma descontraída e engraçada.
+- Continua respondendo enquanto a conversa estiver rolando.
+- Se ninguém mandar mensagem nenhuma por **20 segundos**, ele "desliga" e volta a ficar quieto —
+  só volta a responder se alguém marcar ele de novo.
 
 ## Passo a passo para rodar (do zero)
 
@@ -43,7 +43,7 @@ Copie o arquivo `.env.example` e renomeie a cópia para `.env`. Abra e preencha:
 
 ```
 GROQ_API_KEY=sua_chave_aqui
-ADMIN_NUMBER=5511999999999
+BOT_NUMBER=numero_do_chip_do_bot_com_ddi
 ```
 
 ### 5. Rode o bot
@@ -52,47 +52,31 @@ ADMIN_NUMBER=5511999999999
 npm start
 ```
 
-Vai aparecer um **QR code no terminal**. Abra o WhatsApp no seu celular, vá em
-**Configurações > Aparelhos conectados > Conectar um aparelho** e escaneie o código.
-
-Pronto — o bot está rodando! Adicione o número que você conectou ao grupo (ou use seu
-próprio número) e teste mandando `/Cogb`.
+Vai aparecer um **código de pareamento no terminal**. No WhatsApp Business do número do bot:
+Configurações > Aparelhos conectados > Conectar um aparelho > "Conectar com número de telefone" >
+digite o código.
 
 ## Onde deixar ele rodando 24h
 
-Rodar `npm start` no seu computador ou celular (via Termux) só mantém o bot ativo
-enquanto o aparelho estiver ligado e conectado à internet. Para deixá-lo rodando sempre,
-o mais simples para iniciantes é hospedar em um serviço de nuvem com plano gratuito, como:
-
-- [Render](https://render.com)
-- [Railway](https://railway.app)
-
-Nesses serviços, você sobe esta mesma pasta de projeto, configura as variáveis de
-ambiente (`GROQ_API_KEY` e `ADMIN_NUMBER`) no painel deles, e ele roda `npm start`
-automaticamente. Na primeira vez, você vai precisar ver o QR code nos "logs" do serviço
-para escanear.
+Rodar `npm start` no seu computador ou celular (via Termux) só mantém o bot ativo enquanto o
+aparelho estiver ligado e conectado à internet. Se quiser deixá-lo sempre online, considere um
+serviço de nuvem — mas atenção: planos gratuitos de hospedagem costumam "hibernar" depois de um
+tempo sem uso, o que derruba a conexão do bot. Rodar no próprio celular via Termux, com o celular
+sempre carregando e o app aberto, costuma ser a alternativa mais simples e gratuita.
 
 ## Ajustes que você pode querer fazer
 
-- **Sensibilidade do COGB (quanto sobe)**: no arquivo `moderation.js`, o número `intensidade * 2.5`
-  controla o quão rápido o COGB sobe numa violação. Aumente ou diminua conforme quiser.
-- **Quando o COGB desce**: o COGB só baixa automaticamente quando a pessoa fica um tempo sem
-  cometer nenhuma violação nova (não desce mais por causa de uma única mensagem boa/desculpa).
-  No arquivo `cogb.js`, `DIAS_SEM_VIOLACAO_PARA_DESCER` controla quantos dias de bom comportamento
-  são necessários (padrão: 30 dias) e `QUANTIDADE_QUE_DESCE` controla quanto desce a cada vez
-  (padrão: 5%). Essa verificação roda automaticamente a cada 24h enquanto o bot estiver ligado.
-- **Mensagens do bot**: estão todas em `index.js`, dentro de `sock.sendMessage`.
-- **Reiniciar o placar de alguém**: edite ou apague a entrada da pessoa no arquivo
-  `data/cogb.json`.
+- **Tempo de inatividade**: no `index.js`, a constante `TEMPO_INATIVIDADE_MS` controla quantos
+  segundos sem mensagens fazem o bot "desligar" (padrão: 20 segundos).
+- **Personalidade do bot**: no `chatbot.js`, o `SYSTEM_PROMPT` controla como ele fala — ajuste
+  ali se quiser um tom diferente, mais ou menos engraçado, etc.
 
 ## Estrutura do projeto
 
 ```
 whatsapp-cogb-bot/
-├── index.js          → arquivo principal, conecta ao WhatsApp e escuta mensagens
-├── cogb.js            → guarda e calcula o COGB de cada pessoa
-├── moderation.js       → chama a IA para analisar cada mensagem
-├── data/cogb.json      → banco de dados (arquivo simples) com o COGB de todos
-├── .env.example        → modelo das variáveis de ambiente
+├── index.js       → arquivo principal, conecta ao WhatsApp e escuta mensagens
+├── chatbot.js      → chama a IA da Groq pra gerar as respostas do bot
+├── .env.example    → modelo das variáveis de ambiente
 └── package.json
 ```
