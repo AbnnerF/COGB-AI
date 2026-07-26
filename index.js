@@ -1,112 +1,90 @@
-require('dotenv').config();
-const pino = require('pino');
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-} = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
-const { updateCogb, formatList } = require('./cogb');
-const { analisarMensagem } = require('./moderation');
+const fs = require('fs');
+const path = require('path');
 
-const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // ex: 5511999999999
-const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
+const DATA_FILE = path.join(__dirname, 'data', 'cogb.json');
 
-async function iniciarBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-
-  const sock = makeWASocket({
-    auth: state,
-    logger: pino({ level: 'silent' }),
-    printQRInTerminal: false,
-  });
-
-  // Se ainda não estiver registrado e um BOT_NUMBER foi configurado,
-  // pede um código de pareamento em vez do QR code (mais fácil no celular)
-  if (BOT_NUMBER && !sock.authState.creds.registered) {
-    setTimeout(async () => {
-      try {
-        const codigo = await sock.requestPairingCode(BOT_NUMBER);
-        console.log('\n🔑 Seu código de pareamento é: ' + codigo);
-        console.log('No WhatsApp Business: Aparelhos conectados > Conectar com número de telefone > digite esse código.\n');
-      } catch (err) {
-        console.log('Erro ao gerar código de pareamento:', err.message);
-      }
-    }, 3000);
+// Garante que o arquivo de dados existe
+function ensureFile() {
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify({}, null, 2));
   }
-
-  sock.ev.on('creds.update', saveCreds);
-
-  // Mostra o QR code no terminal pra você escanear com o WhatsApp
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      console.log('\n📱 Escaneie o QR code abaixo no seu WhatsApp:\n');
-      qrcode.generate(qr, { small: true });
-    }
-
-    if (connection === 'close') {
-      const deveReconectar =
-        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('Conexão fechada. Reconectando?', deveReconectar);
-      if (deveReconectar) iniciarBot();
-    } else if (connection === 'open') {
-      console.log('✅ Bot conectado ao WhatsApp!');
-    }
-  });
-
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
-
-    const chatId = msg.key.remoteJid; // grupo ou conversa
-    const isGroup = chatId.endsWith('@g.us');
-    if (!isGroup) return; // o bot só atua em grupos
-
-    const remetenteId = msg.key.participant || msg.key.remoteJid;
-    const nomeRemetente = msg.pushName || remetenteId.split('@')[0];
-
-    const texto =
-      msg.message.conversation ||
-      msg.message.extendedTextMessage?.text ||
-      '';
-
-    if (!texto) return;
-
-    // Comando /Cogb - mostra a lista de todos os membros
-    if (texto.trim().toLowerCase() === '/cogb') {
-      await sock.sendMessage(chatId, { text: formatList() });
-      return;
-    }
-
-    // Qualquer outra mensagem passa pela análise da IA
-    const resultado = await analisarMensagem(texto);
-
-    if (resultado.delta === 0) return; // mensagem neutra, não faz nada
-
-    const novoValor = updateCogb(remetenteId, nomeRemetente, resultado.delta);
-
-    if (resultado.acao === 'violacao') {
-      await sock.sendMessage(chatId, {
-        text: `⚠️ ${nomeRemetente}, isso não foi legal. Seu COGB subiu para *${novoValor}%*.`,
-        mentions: [remetenteId],
-      });
-
-      if (novoValor >= 100 && ADMIN_NUMBER) {
-        await sock.sendMessage(`${ADMIN_NUMBER}@s.whatsapp.net`, {
-          text: `🚨 *Alerta de COGB máximo!*\n\n${nomeRemetente} chegou a 100% de COGB no grupo.\nMotivo mais recente: ${resultado.motivo}`,
-        });
-      }
-    }
-
-    if (resultado.acao === 'elogio') {
-      await sock.sendMessage(chatId, {
-        text: `🎉 Parabéns, ${nomeRemetente}! Seu comportamento foi ótimo e seu COGB baixou para *${novoValor}%*.`,
-        mentions: [remetenteId],
-      });
-    }
-  });
 }
 
-iniciarBot();
+function loadData() {
+  ensureFile();
+  const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+  return JSON.parse(raw);
+}
+
+function saveData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+// Garante que o usuário existe no banco de dados
+function ensureUser(data, userId, name) {
+  if (!data[userId]) {
+    data[userId] = { name: name || userId, cogb: 0 };
+  } else if (name) {
+    data[userId].name = name; // mantém o nome atualizado
+  }
+}
+
+// Aumenta ou diminui o COGB de um usuário, sempre entre 0 e 100
+function updateCogb(userId, name, delta) {
+  const data = loadData();
+  ensureUser(data, userId, name);
+
+  let novoValor = data[userId].cogb + delta;
+  if (novoValor > 100) novoValor = 100;
+  if (novoValor < 0) novoValor = 0;
+
+  data[userId].cogb = novoValor;
+  saveData(data);
+
+  return novoValor;
+}
+
+function getUserCogb(userId) {
+  const data = loadData();
+  return data[userId] ? data[userId].cogb : 0;
+}
+
+// Monta o texto com a lista de todos os membros do grupo e seus COGB, do maior pro menor.
+// participantes: array de { id, name } vindo do grupo do WhatsApp
+function formatList(participantes) {
+  const data = loadData();
+
+  if (!participantes || participantes.length === 0) {
+    return '📊 *COGB do grupo*\n\nNão consegui ler a lista de membros do grupo.';
+  }
+
+  const linhas = participantes.map((p) => {
+    const registro = data[p.id];
+    return {
+      name: registro?.name || p.name,
+      cogb: registro ? registro.cogb : 0,
+    };
+  });
+
+  linhas.sort((a, b) => b.cogb - a.cogb);
+
+  let texto = '📊 *COGB do grupo* (chances de banimento)\n\n';
+  for (const linha of linhas) {
+    texto += `${barraDeRisco(linha.cogb)} ${linha.name}: *${linha.cogb}%*\n`;
+  }
+  return texto;
+}
+
+// Emoji visual simples de acordo com o nível de risco
+function barraDeRisco(valor) {
+  if (valor >= 80) return '🔴';
+  if (valor >= 50) return '🟠';
+  if (valor >= 20) return '🟡';
+  return '🟢';
+}
+
+module.exports = {
+  updateCogb,
+  getUserCogb,
+  formatList,
+};
