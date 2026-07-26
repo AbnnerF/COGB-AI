@@ -13,22 +13,24 @@ Responda APENAS em JSON puro, sem markdown, sem explicações fora do JSON, no f
 {"acao": "violacao" | "neutro", "intensidade": 1 a 10, "motivo": "breve explicação em português"}
 
 Regras:
-- "violacao": a mensagem contém xingamento, ofensa, ameaça ou agressão CLARA, DIRETA e em português
-  (ou outro idioma que você reconheça com certeza) contra alguém do grupo.
+- "violacao": a mensagem contém um xingamento, ofensa ou palavrão REAL e reconhecível em português
+  (ex: "fdp", "porra", "filho da puta", "vsf", palavras de baixo calão em geral) — não precisa estar
+  necessariamente direcionado a uma pessoa específica, basta ser linguagem ofensiva/de baixo calão
+  usada na conversa. Ameaças e agressões diretas contra alguém também contam.
 - "neutro": qualquer outra coisa, incluindo:
   - conversa normal, brincadeiras leves entre amigos, sarcasmo sem alvo
   - desculpas ou autocrítica (ex: "desculpa por xingar ontem")
   - comentários sobre o próprio bot/COGB ou suas configurações
   - emoticons, carinhas (ex: "×_×", ":/", "-_-"), figurinhas, ou reações sem texto
-  - sequências de símbolos, pontuação repetida, ou "keysmash" sem sentido claro (ex: "m(#!$+_;$+$;$;$;")
-  - siglas, abreviações ou gírias que você NÃO reconhece com certeza como ofensivas
-  - qualquer mensagem cujo significado esteja ambíguo ou pouco claro
-- Se você não tem certeza absoluta de que é uma ofensa real e compreensível, classifique como "neutro".
-  Símbolos, emoticons e siglas desconhecidas NUNCA devem ser tratados como violação, mesmo que pareçam
-  suspeitos — só ofensas em palavras reais e claras contam.
+  - sequências de símbolos, pontuação repetida, ou "keysmash" sem sentido claro
+  - abreviações e gírias comuns SEM conotação ofensiva (ex: "mds" = "meu deus", "vc", "blz", "slk",
+    "kk", "rs", "top", "dahora") — essas NUNCA são violação, mesmo parecendo estranhas
+  - siglas ou termos que você não reconhece com certeza como ofensivos
+- Na dúvida entre um xingamento real e uma abreviação/gíria inofensiva, pense no significado mais comum
+  da expressão em português do dia a dia antes de decidir.
 - "intensidade" mede o quão grave foi a violação (1 = leve, 10 = extremo, reservado para ameaças graves
-  ou discurso de ódio). A grande maioria das violações reais deve ficar entre 1 e 4. Só use 8+ em casos
-  claramente extremos (ameaças de violência real, discurso de ódio explícito).`;
+  ou discurso de ódio). Um palavrão comum (tipo "porra", "fdp") deve ficar entre 2 e 4. Só use 8+ em
+  casos claramente extremos (ameaças de violência real, discurso de ódio explícito).`;
 
   try {
     const response = await fetch(API_URL, {
