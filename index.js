@@ -6,7 +6,7 @@ const {
   DisconnectReason,
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
-const { updateCogb, formatList } = require('./cogb');
+const { updateCogb, formatList, registrarViolacao, aplicarDecaimentoAutomatico } = require('./cogb');
 const { analisarMensagem } = require('./moderation');
 
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // ex: 5511999999999
@@ -46,6 +46,23 @@ async function iniciarBot() {
   }
 
   sock.ev.on('creds.update', saveCreds);
+
+  // Uma vez por dia, verifica se alguém já ficou tempo suficiente sem violar
+  // nenhuma regra e, se sim, reduz o COGB dessa pessoa automaticamente
+  setInterval(async () => {
+    const atualizados = aplicarDecaimentoAutomatico();
+    for (const pessoa of atualizados) {
+      if (!pessoa.chatId) continue;
+      try {
+        await sock.sendMessage(pessoa.chatId, {
+          text: `🎉 ${pessoa.name} manteve um bom comportamento e seu COGB baixou para *${pessoa.novoValor}%*.`,
+          mentions: [pessoa.id],
+        });
+      } catch (err) {
+        console.log('Erro ao avisar decaimento de COGB:', err.message);
+      }
+    }
+  }, 24 * 60 * 60 * 1000); // a cada 24 horas
 
   // Vai guardando os nomes reais dos contatos conforme o WhatsApp sincroniza
   sock.ev.on('contacts.upsert', (contatos) => contatos.forEach(salvarContato));
@@ -112,28 +129,20 @@ async function iniciarBot() {
 
     if (resultado.delta === 0) return; // mensagem neutra, não faz nada
 
-    const novoValor = updateCogb(remetenteId, nomeRemetente, resultado.delta);
+    const novoValor = registrarViolacao(remetenteId, nomeRemetente, resultado.delta, chatId);
 
-    if (resultado.acao === 'violacao') {
-      await sock.sendMessage(chatId, {
-        text: `⚠️ ${nomeRemetente}, isso não foi legal. Seu COGB subiu para *${novoValor}%*.`,
-        mentions: [remetenteId],
-      });
+    await sock.sendMessage(chatId, {
+      text: `⚠️ ${nomeRemetente}, isso não foi legal. Seu COGB subiu para *${novoValor}%*.`,
+      mentions: [remetenteId],
+    });
 
-      if (novoValor >= 100 && ADMIN_NUMBER) {
-        await sock.sendMessage(`${ADMIN_NUMBER}@s.whatsapp.net`, {
-          text: `🚨 *Alerta de COGB máximo!*\n\n${nomeRemetente} chegou a 100% de COGB no grupo.\nMotivo mais recente: ${resultado.motivo}`,
-        });
-      }
-    }
-
-    if (resultado.acao === 'elogio') {
-      await sock.sendMessage(chatId, {
-        text: `🎉 Parabéns, ${nomeRemetente}! Seu comportamento foi ótimo e seu COGB baixou para *${novoValor}%*.`,
-        mentions: [remetenteId],
+    if (novoValor >= 100 && ADMIN_NUMBER) {
+      await sock.sendMessage(`${ADMIN_NUMBER}@s.whatsapp.net`, {
+        text: `🚨 *Alerta de COGB máximo!*\n\n${nomeRemetente} chegou a 100% de COGB no grupo.\nMotivo mais recente: ${resultado.motivo}`,
       });
     }
   });
 }
 
 iniciarBot();
+          
