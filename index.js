@@ -10,6 +10,7 @@ const { updateCogb, formatList } = require('./cogb');
 const { analisarMensagem } = require('./moderation');
 
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // ex: 5511999999999
+const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
 async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
@@ -19,6 +20,20 @@ async function iniciarBot() {
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
   });
+
+  // Se ainda não estiver registrado e um BOT_NUMBER foi configurado,
+  // pede um código de pareamento em vez do QR code (mais fácil no celular)
+  if (BOT_NUMBER && !sock.authState.creds.registered) {
+    setTimeout(async () => {
+      try {
+        const codigo = await sock.requestPairingCode(BOT_NUMBER);
+        console.log('\n🔑 Seu código de pareamento é: ' + codigo);
+        console.log('No WhatsApp Business: Aparelhos conectados > Conectar com número de telefone > digite esse código.\n');
+      } catch (err) {
+        console.log('Erro ao gerar código de pareamento:', err.message);
+      }
+    }, 3000);
+  }
 
   sock.ev.on('creds.update', saveCreds);
 
