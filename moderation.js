@@ -1,6 +1,6 @@
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.3-70b-versatile'; // modelo gratuito da Groq, bom pra classificação
+const MODEL = 'llama-3.1-8b-instant'; // modelo leve da Groq, com limite diário gratuito bem maior
 
 /**
  * Analisa uma mensagem e decide se o COGB da pessoa deve subir.
