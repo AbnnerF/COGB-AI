@@ -74,9 +74,13 @@ para escanear.
 
 ## Ajustes que você pode querer fazer
 
-- **Sensibilidade do COGB**: no arquivo `moderation.js`, os números `intensidade * 2.5`
-  (quanto sobe) e `intensidade * 1.5` (quanto desce) controlam o quão rápido o COGB
-  muda. Aumente ou diminua conforme quiser.
+- **Sensibilidade do COGB (quanto sobe)**: no arquivo `moderation.js`, o número `intensidade * 2.5`
+  controla o quão rápido o COGB sobe numa violação. Aumente ou diminua conforme quiser.
+- **Quando o COGB desce**: o COGB só baixa automaticamente quando a pessoa fica um tempo sem
+  cometer nenhuma violação nova (não desce mais por causa de uma única mensagem boa/desculpa).
+  No arquivo `cogb.js`, `DIAS_SEM_VIOLACAO_PARA_DESCER` controla quantos dias de bom comportamento
+  são necessários (padrão: 30 dias) e `QUANTIDADE_QUE_DESCE` controla quanto desce a cada vez
+  (padrão: 5%). Essa verificação roda automaticamente a cada 24h enquanto o bot estiver ligado.
 - **Mensagens do bot**: estão todas em `index.js`, dentro de `sock.sendMessage`.
 - **Reiniciar o placar de alguém**: edite ou apague a entrada da pessoa no arquivo
   `data/cogb.json`.
