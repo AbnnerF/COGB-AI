@@ -12,6 +12,16 @@ const { analisarMensagem } = require('./moderation');
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // ex: 5511999999999
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
+// Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
+const contatosCache = {};
+
+function salvarContato(contato) {
+  const nome = contato.name || contato.notify || contato.verifiedName;
+  if (contato.id && nome) {
+    contatosCache[contato.id] = nome;
+  }
+}
+
 async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
@@ -36,6 +46,10 @@ async function iniciarBot() {
   }
 
   sock.ev.on('creds.update', saveCreds);
+
+  // Vai guardando os nomes reais dos contatos conforme o WhatsApp sincroniza
+  sock.ev.on('contacts.upsert', (contatos) => contatos.forEach(salvarContato));
+  sock.ev.on('contacts.update', (contatos) => contatos.forEach(salvarContato));
 
   // Mostra o QR code no terminal pra você escanear com o WhatsApp
   sock.ev.on('connection.update', (update) => {
@@ -65,7 +79,8 @@ async function iniciarBot() {
     if (!isGroup) return; // o bot só atua em grupos
 
     const remetenteId = msg.key.participant || msg.key.remoteJid;
-    const nomeRemetente = msg.pushName || remetenteId.split('@')[0];
+    const nomeRemetente = contatosCache[remetenteId] || msg.pushName || remetenteId.split('@')[0];
+    if (msg.pushName) contatosCache[remetenteId] = contatosCache[remetenteId] || msg.pushName;
 
     const texto =
       msg.message.conversation ||
@@ -80,7 +95,7 @@ async function iniciarBot() {
         const metadata = await sock.groupMetadata(chatId);
         const participantes = metadata.participants.map((p) => ({
           id: p.id,
-          name: p.id.split('@')[0],
+          name: contatosCache[p.id] || p.id.split('@')[0],
         }));
         await sock.sendMessage(chatId, { text: formatList(participantes) });
       } catch (err) {
