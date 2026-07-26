@@ -27,10 +27,57 @@ function saveData(data) {
 // Garante que o usuário existe no banco de dados
 function ensureUser(data, userId, name) {
   if (!data[userId]) {
-    data[userId] = { name: name || userId, cogb: 0 };
-  } else if (name) {
-    data[userId].name = name; // mantém o nome atualizado
+    data[userId] = { name: name || userId, cogb: 0, ultimaViolacao: null, chatId: null };
+  } else {
+    if (name) data[userId].name = name; // mantém o nome atualizado
+    if (data[userId].ultimaViolacao === undefined) data[userId].ultimaViolacao = null;
+    if (data[userId].chatId === undefined) data[userId].chatId = null;
   }
+}
+
+// Registra uma violação: aumenta o COGB e marca a data, pra resetar a contagem de "bom comportamento"
+function registrarViolacao(userId, name, delta, chatId) {
+  const data = loadData();
+  ensureUser(data, userId, name);
+
+  let novoValor = data[userId].cogb + delta;
+  if (novoValor > 100) novoValor = 100;
+
+  data[userId].cogb = novoValor;
+  data[userId].ultimaViolacao = Date.now();
+  data[userId].chatId = chatId;
+  saveData(data);
+
+  return novoValor;
+}
+
+// Quantos dias sem violação são necessários pra começar a reduzir o COGB, e quanto reduz por vez
+const DIAS_SEM_VIOLACAO_PARA_DESCER = 30; // ~1 mês de bom comportamento
+const QUANTIDADE_QUE_DESCE = 5;
+
+// Roda periodicamente: reduz o COGB de quem ficou tempo suficiente sem nenhuma violação nova.
+// Retorna a lista de pessoas cujo COGB baixou, pra o bot poder avisar elas no grupo.
+function aplicarDecaimentoAutomatico() {
+  const data = loadData();
+  const agora = Date.now();
+  const limiteMs = DIAS_SEM_VIOLACAO_PARA_DESCER * 24 * 60 * 60 * 1000;
+  const atualizados = [];
+
+  for (const [userId, info] of Object.entries(data)) {
+    if (info.cogb <= 0) continue;
+    if (!info.ultimaViolacao) continue; // nunca violou nada, não tem o que "descer" por tempo
+    if (agora - info.ultimaViolacao < limiteMs) continue;
+
+    const novoValor = Math.max(0, info.cogb - QUANTIDADE_QUE_DESCE);
+    data[userId].cogb = novoValor;
+    // adia a próxima redução, senão desceria de novo amanhã
+    data[userId].ultimaViolacao = agora - limiteMs + 24 * 60 * 60 * 1000;
+
+    atualizados.push({ id: userId, name: info.name, novoValor, chatId: info.chatId });
+  }
+
+  saveData(data);
+  return atualizados;
 }
 
 // Aumenta ou diminui o COGB de um usuário, sempre entre 0 e 100
@@ -91,4 +138,6 @@ module.exports = {
   updateCogb,
   getUserCogb,
   formatList,
+  registrarViolacao,
+  aplicarDecaimentoAutomatico,
 };
