@@ -49,20 +49,28 @@ function getUserCogb(userId) {
   return data[userId] ? data[userId].cogb : 0;
 }
 
-// Monta o texto com a lista de todos os membros e seus COGB, do maior pro menor
-function formatList() {
+// Monta o texto com a lista de todos os membros do grupo e seus COGB, do maior pro menor.
+// participantes: array de { id, name } vindo do grupo do WhatsApp
+function formatList(participantes) {
   const data = loadData();
-  const entries = Object.entries(data);
 
-  if (entries.length === 0) {
-    return '📊 *COGB do grupo*\n\nAinda não há registros de ninguém.';
+  if (!participantes || participantes.length === 0) {
+    return '📊 *COGB do grupo*\n\nNão consegui ler a lista de membros do grupo.';
   }
 
-  entries.sort((a, b) => b[1].cogb - a[1].cogb);
+  const linhas = participantes.map((p) => {
+    const registro = data[p.id];
+    return {
+      name: registro?.name || p.name,
+      cogb: registro ? registro.cogb : 0,
+    };
+  });
+
+  linhas.sort((a, b) => b.cogb - a.cogb);
 
   let texto = '📊 *COGB do grupo* (chances de banimento)\n\n';
-  for (const [, info] of entries) {
-    texto += `${barraDeRisco(info.cogb)} ${info.name}: *${info.cogb}%*\n`;
+  for (const linha of linhas) {
+    texto += `${barraDeRisco(linha.cogb)} ${linha.name}: *${linha.cogb}%*\n`;
   }
   return texto;
 }
