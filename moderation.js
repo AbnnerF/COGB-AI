@@ -52,7 +52,8 @@ Regras:
 
     const data = await response.json();
 
-    if (!data.choices || !data.choices[0]) {
+    if (!response.ok || !data.choices || !data.choices[0]) {
+      console.log('Resposta da Groq (erro):', JSON.stringify(data));
       throw new Error('Resposta inesperada da API');
     }
 
