@@ -26,17 +26,6 @@ function salvarContato(contato) {
   }
 }
 
-// Verifica se a mensagem menciona (@) o número do bot
-function mencionaBot(msg, texto, botJid) {
-  const mentionedJid = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-  const botBase = botJid.split(':')[0].split('@')[0];
-
-  const mencionadoPorJid = mentionedJid.some((jid) => jid.split('@')[0] === botBase);
-  const mencionadoPorTexto = texto.includes(`@${botBase}`);
-
-  return mencionadoPorJid || mencionadoPorTexto;
-}
-
 // Remove as marcações de menção (tipo "@5511999999999") do texto antes de mandar pra IA
 function limparMencoes(texto) {
   return texto.replace(/@\d+/g, '').trim();
@@ -110,21 +99,24 @@ async function iniciarBot() {
 
     if (!texto) return;
 
-    const foiChamado = mencionaBot(msg, texto, sock.user.id);
+    const comandoAtivar = texto.trim().toLowerCase() === '/bot';
     const conversaJaAtiva = Boolean(conversasAtivas[chatId]);
 
-    console.log(
-      `[debug] de: ${nomeRemetente} | texto: "${texto}" | mencionou: ${foiChamado} | ativo: ${conversaJaAtiva} | botJid: ${sock.user.id} | mentionedJid: ${JSON.stringify(msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])}`
-    );
-
-    // Se não foi chamado e a conversa não tá ativa nesse grupo, o bot ignora a mensagem
-    if (!foiChamado && !conversaJaAtiva) return;
+    // Se não foi o comando /Bot e a conversa não tá ativa nesse grupo, o bot ignora a mensagem
+    if (!comandoAtivar && !conversaJaAtiva) return;
 
     // (Re)inicia o cronômetro de 20s: se ninguém mais falar nesse tempo, a conversa "desliga"
     if (conversasAtivas[chatId]) clearTimeout(conversasAtivas[chatId]);
     conversasAtivas[chatId] = setTimeout(() => {
       delete conversasAtivas[chatId];
     }, TEMPO_INATIVIDADE_MS);
+
+    // Quando é só o comando de ativação, manda uma saudação em vez de tentar "responder" o comando
+    if (comandoAtivar) {
+      const saudacao = await gerarResposta(nomeRemetente, 'acabou de te chamar pra participar da conversa do grupo, manda um "e aí" descontraído');
+      if (saudacao) await sock.sendMessage(chatId, { text: saudacao });
+      return;
+    }
 
     const resposta = await gerarResposta(nomeRemetente, limparMencoes(texto));
     if (!resposta) return;
@@ -134,3 +126,4 @@ async function iniciarBot() {
 }
 
 iniciarBot();
+
