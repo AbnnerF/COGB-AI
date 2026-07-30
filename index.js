@@ -27,10 +27,14 @@ function salvarContato(contato) {
 }
 
 // Verifica se a mensagem menciona (@) o número do bot
-function mencionaBot(msg, botJid) {
+function mencionaBot(msg, texto, botJid) {
   const mentionedJid = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
   const botBase = botJid.split(':')[0].split('@')[0];
-  return mentionedJid.some((jid) => jid.split('@')[0] === botBase);
+
+  const mencionadoPorJid = mentionedJid.some((jid) => jid.split('@')[0] === botBase);
+  const mencionadoPorTexto = texto.includes(`@${botBase}`);
+
+  return mencionadoPorJid || mencionadoPorTexto;
 }
 
 // Remove as marcações de menção (tipo "@5511999999999") do texto antes de mandar pra IA
@@ -106,8 +110,12 @@ async function iniciarBot() {
 
     if (!texto) return;
 
-    const foiChamado = mencionaBot(msg, sock.user.id);
+    const foiChamado = mencionaBot(msg, texto, sock.user.id);
     const conversaJaAtiva = Boolean(conversasAtivas[chatId]);
+
+    console.log(
+      `[debug] de: ${nomeRemetente} | texto: "${texto}" | mencionou: ${foiChamado} | ativo: ${conversaJaAtiva} | botJid: ${sock.user.id} | mentionedJid: ${JSON.stringify(msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])}`
+    );
 
     // Se não foi chamado e a conversa não tá ativa nesse grupo, o bot ignora a mensagem
     if (!foiChamado && !conversaJaAtiva) return;
