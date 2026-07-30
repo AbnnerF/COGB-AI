@@ -31,6 +31,18 @@ function limparMencoes(texto) {
   return texto.replace(/@\d+/g, '').trim();
 }
 
+// Espera um tempo (parecendo "digitando...") antes de mandar a mensagem, pra ficar mais natural
+async function enviarComAtraso(sock, chatId, texto) {
+  const atrasoMs = 2000 + Math.random() * 4000; // entre 2 e 6 segundos
+  try {
+    await sock.sendPresenceUpdate('composing', chatId);
+  } catch (err) {
+    // se não conseguir mostrar "digitando", não tem problema, segue o baile
+  }
+  await new Promise((resolve) => setTimeout(resolve, atrasoMs));
+  await sock.sendMessage(chatId, { text: texto });
+}
+
 async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
@@ -114,16 +126,15 @@ async function iniciarBot() {
     // Quando é só o comando de ativação, manda uma saudação em vez de tentar "responder" o comando
     if (comandoAtivar) {
       const saudacao = await gerarResposta(nomeRemetente, 'acabou de te chamar pra participar da conversa do grupo, manda um "e aí" descontraído');
-      if (saudacao) await sock.sendMessage(chatId, { text: saudacao });
+      if (saudacao) await enviarComAtraso(sock, chatId, saudacao);
       return;
     }
 
     const resposta = await gerarResposta(nomeRemetente, limparMencoes(texto));
     if (!resposta) return;
 
-    await sock.sendMessage(chatId, { text: resposta });
+    await enviarComAtraso(sock, chatId, resposta);
   });
 }
 
 iniciarBot();
-
