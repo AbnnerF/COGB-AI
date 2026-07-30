@@ -11,7 +11,7 @@ const { gerarResposta } = require('./chatbot');
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
 // Quanto tempo (em ms) o bot continua "no papo" depois da última mensagem, sem precisar ser chamado de novo
-const TEMPO_INATIVIDADE_MS = 20 * 1000;
+const TEMPO_INATIVIDADE_MS = 10 * 1000;
 
 // Guarda, por grupo, se a conversa tá "ativa" no momento (bot participando sem precisar ser chamado)
 const conversasAtivas = {}; // chatId -> timeoutHandle
