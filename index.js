@@ -4,9 +4,11 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
+  downloadMediaMessage,
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const { gerarResposta } = require('./chatbot');
+const { gerarFigurinha, criarFigurinhaDeImagem } = require('./sticker');
 
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
@@ -15,6 +17,13 @@ const TEMPO_INATIVIDADE_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 // Guarda, por grupo, se a conversa tá "ativa" no momento (bot participando sem precisar ser chamado)
 const conversasAtivas = {}; // chatId -> timeoutHandle
+
+// Guarda o histórico recente de cada conversa, pro bot lembrar do que já foi dito
+const historicoConversas = {}; // chatId -> array de { role, content }
+const MAX_HISTORICO = 20; // quantidade de mensagens recentes que ele guarda por grupo
+
+// Guarda quem pediu "/Create fig" e tá esperando mandar a foto (chave: "chatId:remetenteId")
+const aguardandoFoto = {};
 
 // Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
 const contatosCache = {};
@@ -98,11 +107,36 @@ async function iniciarBot() {
 
     const chatId = msg.key.remoteJid; // grupo ou conversa
     const isGroup = chatId.endsWith('@g.us');
-    if (!isGroup) return; // o bot só atua em grupos
 
     const remetenteId = msg.key.participant || msg.key.remoteJid;
     const nomeRemetente = contatosCache[remetenteId] || msg.pushName || remetenteId.split('@')[0];
     if (msg.pushName) contatosCache[remetenteId] = contatosCache[remetenteId] || msg.pushName;
+
+    const chaveEspera = `${chatId}:${remetenteId}`;
+
+    // Se a pessoa já tinha pedido "/Create fig" e agora mandou uma foto, é essa foto que vira a figurinha
+    if (msg.message.imageMessage && aguardandoFoto[chaveEspera]) {
+      clearTimeout(aguardandoFoto[chaveEspera]);
+      delete aguardandoFoto[chaveEspera];
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema se não conseguir mostrar "digitando"
+      }
+
+      const legenda = msg.message.imageMessage.caption || '';
+      const bufferImagem = await downloadMediaMessage(msg, 'buffer', {});
+      const figurinha = await criarFigurinhaDeImagem(bufferImagem, legenda);
+
+      if (!figurinha) {
+        await sock.sendMessage(chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
+        return;
+      }
+
+      await sock.sendMessage(chatId, { sticker: figurinha });
+      return;
+    }
 
     const texto =
       msg.message.conversation ||
@@ -111,27 +145,78 @@ async function iniciarBot() {
 
     if (!texto) return;
 
+    // Comando /Create fig - pede pra pessoa mandar a foto (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase() === '/create fig') {
+      aguardandoFoto[chaveEspera] = setTimeout(() => {
+        delete aguardandoFoto[chaveEspera];
+      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a foto
+
+      await sock.sendMessage(chatId, {
+        text: 'Manda a foto aí! 📸 Se quiser, coloca uma legenda nela — isso vira o nome da figurinha.',
+      });
+      return;
+    }
+
+    // Comando /fig <descrição> - gera uma figurinha com IA (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase().startsWith('/fig ')) {
+      const descricao = texto.trim().slice(5).trim();
+      if (!descricao) {
+        await sock.sendMessage(chatId, { text: 'Descreve o que você quer na figurinha! Ex: /fig gato astronauta' });
+        return;
+      }
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema se não conseguir mostrar "digitando"
+      }
+
+      const figurinha = await gerarFigurinha(descricao);
+      if (!figurinha) {
+        await sock.sendMessage(chatId, { text: 'Deu ruim pra gerar a figurinha agora 😕 tenta de novo' });
+        return;
+      }
+
+      await sock.sendMessage(chatId, { sticker: figurinha });
+      return;
+    }
+
+    if (!isGroup) return; // a conversa casual (/Bot) só funciona em grupos
+
     const comandoAtivar = texto.trim().toLowerCase() === '/bot';
     const conversaJaAtiva = Boolean(conversasAtivas[chatId]);
 
     // Se não foi o comando /Bot e a conversa não tá ativa nesse grupo, o bot ignora a mensagem
     if (!comandoAtivar && !conversaJaAtiva) return;
 
-    // (Re)inicia o cronômetro de 20s: se ninguém mais falar nesse tempo, a conversa "desliga"
+    // (Re)inicia o cronômetro: se ninguém mais falar nesse tempo, a conversa "desliga" e esquece o histórico
     if (conversasAtivas[chatId]) clearTimeout(conversasAtivas[chatId]);
     conversasAtivas[chatId] = setTimeout(() => {
       delete conversasAtivas[chatId];
+      delete historicoConversas[chatId];
     }, TEMPO_INATIVIDADE_MS);
 
-    // Quando é só o comando de ativação, manda uma saudação em vez de tentar "responder" o comando
+    // Quando é só o comando de ativação, começa um histórico novo e manda uma saudação
     if (comandoAtivar) {
-      const saudacao = await gerarResposta(nomeRemetente, 'acabou de te chamar pra participar da conversa do grupo, manda um "e aí" descontraído');
-      if (saudacao) await enviarComAtraso(sock, chatId, saudacao);
+      historicoConversas[chatId] = [];
+      const saudacao = await gerarResposta([
+        { role: 'user', content: `${nomeRemetente} acabou de te chamar pra participar da conversa do grupo, manda um "e aí" descontraído` },
+      ]);
+      if (saudacao) {
+        historicoConversas[chatId].push({ role: 'assistant', content: saudacao });
+        await enviarComAtraso(sock, chatId, saudacao);
+      }
       return;
     }
 
-    const resposta = await gerarResposta(nomeRemetente, limparMencoes(texto));
+    if (!historicoConversas[chatId]) historicoConversas[chatId] = [];
+    historicoConversas[chatId].push({ role: 'user', content: `${nomeRemetente}: ${limparMencoes(texto)}` });
+
+    const resposta = await gerarResposta(historicoConversas[chatId].slice(-MAX_HISTORICO));
     if (!resposta) return;
+
+    historicoConversas[chatId].push({ role: 'assistant', content: resposta });
+    historicoConversas[chatId] = historicoConversas[chatId].slice(-MAX_HISTORICO);
 
     await enviarComAtraso(sock, chatId, resposta);
   });
