@@ -8,7 +8,7 @@ const {
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const { gerarResposta } = require('./chatbot');
-const { gerarFigurinha, criarFigurinhaDeImagem } = require('./sticker');
+const { gerarFigurinha, criarFigurinhaDeImagem, obterDimensoes, ehDesproporcional } = require('./sticker');
 
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
@@ -24,6 +24,9 @@ const MAX_HISTORICO = 20; // quantidade de mensagens recentes que ele guarda por
 
 // Guarda quem pediu "/Create fig" e tá esperando mandar a foto (chave: "chatId:remetenteId")
 const aguardandoFoto = {};
+
+// Guarda quem já mandou uma foto desproporcional e tá esperando escolher o formato
+const aguardandoEscolhaFormato = {}; // chave -> { bufferImagem, legenda, timeoutHandle }
 
 // Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
 const contatosCache = {};
@@ -119,14 +122,38 @@ async function iniciarBot() {
       clearTimeout(aguardandoFoto[chaveEspera]);
       delete aguardandoFoto[chaveEspera];
 
+      const legenda = msg.message.imageMessage.caption || '';
+      const bufferImagem = await downloadMediaMessage(msg, 'buffer', {});
+
+      const dimensoes = await obterDimensoes(bufferImagem).catch(() => null);
+
+      // Se a imagem não é quadrada, pergunta como a pessoa quer o formato antes de criar
+      if (dimensoes && ehDesproporcional(dimensoes)) {
+        aguardandoEscolhaFormato[chaveEspera] = {
+          bufferImagem,
+          legenda,
+          timeoutHandle: setTimeout(() => {
+            delete aguardandoEscolhaFormato[chaveEspera];
+          }, 5 * 60 * 1000),
+        };
+
+        await sock.sendMessage(chatId, {
+          text:
+            'Essa imagem não é quadrada! Como você quer a figurinha?\n\n' +
+            '1️⃣ Recortada — corta as bordas pra preencher tudo\n' +
+            '2️⃣ Original — mantém a imagem inteira, com bordas\n' +
+            '3️⃣ Esticada — estica pra preencher (pode distorcer um pouco)\n\n' +
+            'Responde com o número ou o nome da opção.',
+        });
+        return;
+      }
+
       try {
         await sock.sendPresenceUpdate('composing', chatId);
       } catch (err) {
         // sem problema se não conseguir mostrar "digitando"
       }
 
-      const legenda = msg.message.imageMessage.caption || '';
-      const bufferImagem = await downloadMediaMessage(msg, 'buffer', {});
       const figurinha = await criarFigurinhaDeImagem(bufferImagem, legenda);
 
       if (!figurinha) {
@@ -144,6 +171,44 @@ async function iniciarBot() {
       '';
 
     if (!texto) return;
+
+    // Se a pessoa tá escolhendo o formato de uma figurinha pendente
+    if (aguardandoEscolhaFormato[chaveEspera]) {
+      const escolha = texto.trim().toLowerCase();
+      const mapaEscolhas = {
+        '1': 'recortada', recortada: 'recortada', recortar: 'recortada',
+        '2': 'original', original: 'original',
+        '3': 'esticada', esticada: 'esticada', esticado: 'esticada',
+      };
+      const modo = mapaEscolhas[escolha];
+
+      if (!modo) {
+        await sock.sendMessage(chatId, {
+          text: 'Não entendi 😅 responde com 1, 2 ou 3 (ou o nome da opção: recortada, original, esticada).',
+        });
+        return;
+      }
+
+      const pendente = aguardandoEscolhaFormato[chaveEspera];
+      clearTimeout(pendente.timeoutHandle);
+      delete aguardandoEscolhaFormato[chaveEspera];
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema se não conseguir mostrar "digitando"
+      }
+
+      const figurinha = await criarFigurinhaDeImagem(pendente.bufferImagem, pendente.legenda, modo);
+
+      if (!figurinha) {
+        await sock.sendMessage(chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
+        return;
+      }
+
+      await sock.sendMessage(chatId, { sticker: figurinha });
+      return;
+    }
 
     // Comando /Create fig - pede pra pessoa mandar a foto (funciona em grupo ou no privado)
     if (texto.trim().toLowerCase() === '/create fig') {
