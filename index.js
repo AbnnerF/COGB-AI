@@ -106,7 +106,7 @@ async function iniciarBot() {
       console.log('Motivo da desconexão (código):', statusCode, '-', lastDisconnect?.error?.message);
       const deveReconectar = statusCode !== DisconnectReason.loggedOut;
       console.log('Conexão fechada. Reconectando?', deveReconectar);
-      if (deveReconectar) iniciarBot();
+      if (deveReconectar) setTimeout(iniciarBot, 3000);
     } else if (connection === 'open') {
       console.log('✅ Bot conectado ao WhatsApp!');
     }
@@ -312,4 +312,3 @@ async function iniciarBot() {
 }
 
 iniciarBot();
-
