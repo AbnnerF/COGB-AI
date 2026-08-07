@@ -8,7 +8,15 @@ const {
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const { gerarResposta } = require('./chatbot');
-const { gerarFigurinha, criarFigurinhaDeImagem, obterDimensoes, ehDesproporcional } = require('./sticker');
+const {
+  gerarFigurinha,
+  criarFigurinhaDeImagem,
+  criarFigurinhaAnimada,
+  obterDimensoes,
+  obterDuracao,
+  ehDesproporcional,
+  DURACAO_MAXIMA_FIGURINHA,
+} = require('./sticker');
 
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
@@ -117,21 +125,33 @@ async function iniciarBot() {
 
     const chaveEspera = `${chatId}:${remetenteId}`;
 
-    // Se a pessoa já tinha pedido "/Create fig" e agora mandou uma foto, é essa foto que vira a figurinha
-    if (msg.message.imageMessage && aguardandoFoto[chaveEspera]) {
+    // Se a pessoa já tinha pedido "/Create fig" e agora mandou uma foto, vídeo ou GIF
+    if ((msg.message.imageMessage || msg.message.videoMessage) && aguardandoFoto[chaveEspera]) {
       clearTimeout(aguardandoFoto[chaveEspera]);
       delete aguardandoFoto[chaveEspera];
 
-      const legenda = msg.message.imageMessage.caption || '';
-      const bufferImagem = await downloadMediaMessage(msg, 'buffer', {});
+      const ehVideo = Boolean(msg.message.videoMessage);
+      const legenda = msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
+      const bufferMidia = await downloadMediaMessage(msg, 'buffer', {});
 
-      const dimensoes = await obterDimensoes(bufferImagem).catch(() => null);
+      // Se for vídeo (não GIF) e for mais longo que o permitido, avisa que vai cortar
+      if (ehVideo && !msg.message.videoMessage.gifPlayback) {
+        const duracao = await obterDuracao(bufferMidia).catch(() => null);
+        if (duracao && duracao > DURACAO_MAXIMA_FIGURINHA) {
+          await sock.sendMessage(chatId, {
+            text: `Esse vídeo tem ${duracao.toFixed(1)}s, mas figurinha animada só aguenta até ${DURACAO_MAXIMA_FIGURINHA}s — vou cortar e usar só o começo dele.`,
+          });
+        }
+      }
 
-      // Se a imagem não é quadrada, pergunta como a pessoa quer o formato antes de criar
+      const dimensoes = await obterDimensoes(bufferMidia).catch(() => null);
+
+      // Se não é quadrado(a), pergunta como a pessoa quer o formato antes de criar
       if (dimensoes && ehDesproporcional(dimensoes)) {
         aguardandoEscolhaFormato[chaveEspera] = {
-          bufferImagem,
+          bufferImagem: bufferMidia,
           legenda,
+          animada: ehVideo,
           timeoutHandle: setTimeout(() => {
             delete aguardandoEscolhaFormato[chaveEspera];
           }, 5 * 60 * 1000),
@@ -139,7 +159,7 @@ async function iniciarBot() {
 
         await sock.sendMessage(chatId, {
           text:
-            'Essa imagem não é quadrada! Como você quer a figurinha?\n\n' +
+            `Essa ${ehVideo ? 'mídia' : 'imagem'} não é quadrada! Como você quer a figurinha?\n\n` +
             '1️⃣ Recortada — corta as bordas pra preencher tudo\n' +
             '2️⃣ Original — mantém a imagem inteira, com bordas\n' +
             '3️⃣ Esticada — estica pra preencher (pode distorcer um pouco)\n\n' +
@@ -154,7 +174,9 @@ async function iniciarBot() {
         // sem problema se não conseguir mostrar "digitando"
       }
 
-      const figurinha = await criarFigurinhaDeImagem(bufferImagem, legenda);
+      const figurinha = ehVideo
+        ? await criarFigurinhaAnimada(bufferMidia, legenda)
+        : await criarFigurinhaDeImagem(bufferMidia, legenda);
 
       if (!figurinha) {
         await sock.sendMessage(chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
@@ -199,7 +221,9 @@ async function iniciarBot() {
         // sem problema se não conseguir mostrar "digitando"
       }
 
-      const figurinha = await criarFigurinhaDeImagem(pendente.bufferImagem, pendente.legenda, modo);
+      const figurinha = pendente.animada
+        ? await criarFigurinhaAnimada(pendente.bufferImagem, pendente.legenda, modo)
+        : await criarFigurinhaDeImagem(pendente.bufferImagem, pendente.legenda, modo);
 
       if (!figurinha) {
         await sock.sendMessage(chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
@@ -217,7 +241,7 @@ async function iniciarBot() {
       }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a foto
 
       await sock.sendMessage(chatId, {
-        text: 'Manda a foto aí! 📸 Se quiser, coloca uma legenda nela — isso vira o nome da figurinha.',
+        text: `Manda a foto, vídeo ou GIF aí! 📸 Se quiser, coloca uma legenda — isso vira o nome da figurinha. (vídeos com mais de ${DURACAO_MAXIMA_FIGURINHA}s são cortados automaticamente)`,
       });
       return;
     }
@@ -288,3 +312,4 @@ async function iniciarBot() {
 }
 
 iniciarBot();
+
