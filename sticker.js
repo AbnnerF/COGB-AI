@@ -38,16 +38,16 @@ async function obterDimensoes(bufferImagem) {
 function ehDesproporcional({ largura, altura } = {}) {
   if (!largura || !altura) return false;
   const proporcao = largura / altura;
-  return Math.abs(proporcao - 1) > 0.05; // mais de 5% de diferença entre largura e altura
+  return Math.abs(proporcao - 1) > 0.02; // mais de 2% de diferença entre largura e altura
 }
 
 // Converte um buffer de imagem (jpg/png/etc) num buffer de figurinha (webp 512x512)
-async function converterParaWebp(bufferImagem, modo = 'original') {
+async function converterParaWebp(bufferImagem, modo = 'recortada') {
   garantirPastaTemp();
   const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.jpg`);
   const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.webp`);
-  const filtro = FILTROS[modo] || FILTROS.original;
+  const filtro = FILTROS[modo] || FILTROS.recortada;
 
   try {
     fs.writeFileSync(caminhoEntrada, bufferImagem);
@@ -111,7 +111,7 @@ async function gerarFigurinha(descricao) {
  * modo: 'recortada' | 'original' | 'esticada'
  * Retorna um Buffer com a figurinha, ou null se der algum erro.
  */
-async function criarFigurinhaDeImagem(bufferImagem, legenda, modo = 'original') {
+async function criarFigurinhaDeImagem(bufferImagem, legenda, modo = 'recortada') {
   try {
     const webpBuffer = await converterParaWebp(bufferImagem, modo);
     return adicionarMetadados(webpBuffer, legenda);
@@ -152,12 +152,12 @@ const FILTROS_VIDEO = {
  * modo: 'recortada' | 'original' | 'esticada'
  * Retorna um Buffer com a figurinha, ou null se der algum erro.
  */
-async function criarFigurinhaAnimada(bufferVideo, legenda, modo = 'original') {
+async function criarFigurinhaAnimada(bufferVideo, legenda, modo = 'recortada') {
   garantirPastaTemp();
   const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.mp4`);
   const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.webp`);
-  const filtro = FILTROS_VIDEO[modo] || FILTROS_VIDEO.original;
+  const filtro = FILTROS_VIDEO[modo] || FILTROS_VIDEO.recortada;
 
   try {
     fs.writeFileSync(caminhoEntrada, bufferVideo);
