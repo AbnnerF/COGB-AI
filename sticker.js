@@ -121,4 +121,66 @@ async function criarFigurinhaDeImagem(bufferImagem, legenda, modo = 'original') 
   }
 }
 
-module.exports = { gerarFigurinha, criarFigurinhaDeImagem, obterDimensoes, ehDesproporcional };
+// Quantos segundos, no máximo, uma figurinha animada pode ter
+const DURACAO_MAXIMA_FIGURINHA = 5;
+
+// Descobre a duração (em segundos) de um vídeo
+async function obterDuracao(bufferVideo) {
+  garantirPastaTemp();
+  const caminho = path.join(PASTA_TEMP, `${Date.now()}-${Math.floor(Math.random() * 10000)}-dur.mp4`);
+  try {
+    fs.writeFileSync(caminho, bufferVideo);
+    const { stdout } = await execAsync(
+      `ffprobe -v error -show_entries format=duration -of csv=p=0 "${caminho}"`
+    );
+    return parseFloat(stdout.trim());
+  } finally {
+    if (fs.existsSync(caminho)) fs.unlinkSync(caminho);
+  }
+}
+
+// Filtros de vídeo pra cada modo (iguais aos de imagem, mas controlando a taxa de quadros)
+const FILTROS_VIDEO = {
+  recortada: 'scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=15',
+  original: 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=white@0,fps=15',
+  esticada: 'scale=512:512,fps=15',
+};
+
+/**
+ * Transforma um vídeo ou GIF numa figurinha animada.
+ * Corta automaticamente pros primeiros segundos (DURACAO_MAXIMA_FIGURINHA) se for mais longo.
+ * modo: 'recortada' | 'original' | 'esticada'
+ * Retorna um Buffer com a figurinha, ou null se der algum erro.
+ */
+async function criarFigurinhaAnimada(bufferVideo, legenda, modo = 'original') {
+  garantirPastaTemp();
+  const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.mp4`);
+  const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.webp`);
+  const filtro = FILTROS_VIDEO[modo] || FILTROS_VIDEO.original;
+
+  try {
+    fs.writeFileSync(caminhoEntrada, bufferVideo);
+    await execAsync(
+      `ffmpeg -y -i "${caminhoEntrada}" -t ${DURACAO_MAXIMA_FIGURINHA} -vf "${filtro}" -loop 0 -an -vsync 0 -vcodec libwebp -q:v 50 -preset default "${caminhoSaida}"`
+    );
+    const webpBuffer = fs.readFileSync(caminhoSaida);
+    return adicionarMetadados(webpBuffer, legenda);
+  } catch (err) {
+    console.log('Erro ao criar figurinha animada:', err.message);
+    return null;
+  } finally {
+    if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
+    if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
+  }
+}
+
+module.exports = {
+  gerarFigurinha,
+  criarFigurinhaDeImagem,
+  criarFigurinhaAnimada,
+  obterDimensoes,
+  obterDuracao,
+  ehDesproporcional,
+  DURACAO_MAXIMA_FIGURINHA,
+};
