@@ -11,17 +11,48 @@ function garantirPastaTemp() {
   if (!fs.existsSync(PASTA_TEMP)) fs.mkdirSync(PASTA_TEMP, { recursive: true });
 }
 
-// Converte um buffer de imagem (jpg/png/etc) num buffer de figurinha (webp 512x512, com bordas transparentes)
-async function converterParaWebp(bufferImagem) {
+// Filtros de conversão pra cada modo de figurinha
+const FILTROS = {
+  recortada: 'scale=512:512:force_original_aspect_ratio=increase,crop=512:512',
+  original: 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=white@0',
+  esticada: 'scale=512:512',
+};
+
+// Descobre a largura e altura de uma imagem
+async function obterDimensoes(bufferImagem) {
+  garantirPastaTemp();
+  const caminho = path.join(PASTA_TEMP, `${Date.now()}-${Math.floor(Math.random() * 10000)}-dim.jpg`);
+  try {
+    fs.writeFileSync(caminho, bufferImagem);
+    const { stdout } = await execAsync(
+      `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "${caminho}"`
+    );
+    const [largura, altura] = stdout.trim().split(',').map(Number);
+    return { largura, altura };
+  } finally {
+    if (fs.existsSync(caminho)) fs.unlinkSync(caminho);
+  }
+}
+
+// Diz se uma imagem é "desproporcional" o bastante pra valer a pena perguntar o formato
+function ehDesproporcional({ largura, altura } = {}) {
+  if (!largura || !altura) return false;
+  const proporcao = largura / altura;
+  return Math.abs(proporcao - 1) > 0.05; // mais de 5% de diferença entre largura e altura
+}
+
+// Converte um buffer de imagem (jpg/png/etc) num buffer de figurinha (webp 512x512)
+async function converterParaWebp(bufferImagem, modo = 'original') {
   garantirPastaTemp();
   const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.jpg`);
   const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.webp`);
+  const filtro = FILTROS[modo] || FILTROS.original;
 
   try {
     fs.writeFileSync(caminhoEntrada, bufferImagem);
     await execAsync(
-      `ffmpeg -y -i "${caminhoEntrada}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=white@0" -vcodec libwebp -q:v 60 "${caminhoSaida}"`
+      `ffmpeg -y -i "${caminhoEntrada}" -vf "${filtro}" -vcodec libwebp -q:v 60 "${caminhoSaida}"`
     );
     return fs.readFileSync(caminhoSaida);
   } finally {
@@ -77,11 +108,12 @@ async function gerarFigurinha(descricao) {
 
 /**
  * Transforma uma foto enviada pelo usuário numa figurinha, usando a legenda como nome dela.
+ * modo: 'recortada' | 'original' | 'esticada'
  * Retorna um Buffer com a figurinha, ou null se der algum erro.
  */
-async function criarFigurinhaDeImagem(bufferImagem, legenda) {
+async function criarFigurinhaDeImagem(bufferImagem, legenda, modo = 'original') {
   try {
-    const webpBuffer = await converterParaWebp(bufferImagem);
+    const webpBuffer = await converterParaWebp(bufferImagem, modo);
     return adicionarMetadados(webpBuffer, legenda);
   } catch (err) {
     console.log('Erro ao criar figurinha da imagem:', err.message);
@@ -89,4 +121,4 @@ async function criarFigurinhaDeImagem(bufferImagem, legenda) {
   }
 }
 
-module.exports = { gerarFigurinha, criarFigurinhaDeImagem };
+module.exports = { gerarFigurinha, criarFigurinhaDeImagem, obterDimensoes, ehDesproporcional };
