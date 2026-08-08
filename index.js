@@ -17,6 +17,15 @@ const {
   ehDesproporcional,
   DURACAO_MAXIMA_FIGURINHA,
 } = require('./sticker');
+const {
+  MENSAGEM_BOAS_VINDAS_PV,
+  MENSAGEM_GRUPO_ATIVADO,
+  MENSAGEM_GRUPO_PENDENTE,
+  MENSAGEM_GRUPO_RECUSADO,
+} = require('./mensagens');
+const estado = require('./estado');
+
+const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // número que autoriza o bot em novos grupos, ex: 5511999999999
 
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
@@ -92,6 +101,40 @@ async function iniciarBot() {
   sock.ev.on('contacts.upsert', (contatos) => contatos.forEach(salvarContato));
   sock.ev.on('contacts.update', (contatos) => contatos.forEach(salvarContato));
 
+  // Detecta quando o bot é adicionado a um grupo (ou comunidade), e pede autorização ao admin
+  sock.ev.on('group-participants.update', async (evento) => {
+    try {
+      if (evento.action !== 'add') return;
+
+      const botBase = sock.user.id.split(':')[0].split('@')[0];
+      const botFoiAdicionado = evento.participants.some((p) => p.split('@')[0] === botBase);
+      if (!botFoiAdicionado) return;
+
+      const chatId = evento.id;
+
+      estado.definirStatusGrupo(chatId, 'pendente');
+      estado.adicionarNaFila(chatId);
+
+      await sock.sendMessage(chatId, { text: MENSAGEM_GRUPO_PENDENTE });
+
+      if (ADMIN_NUMBER) {
+        let nomeGrupo = 'um grupo';
+        try {
+          const metadata = await sock.groupMetadata(chatId);
+          nomeGrupo = metadata.subject || nomeGrupo;
+        } catch (err) {
+          // sem problema se não conseguir pegar o nome
+        }
+
+        await sock.sendMessage(`${ADMIN_NUMBER}@s.whatsapp.net`, {
+          text: `🤖 Fui adicionado no grupo *"${nomeGrupo}"*.\n\nPermite minha entrada nesse grupo? Responda *SIM* ou *NÃO*.`,
+        });
+      }
+    } catch (err) {
+      console.log('Erro ao processar entrada em grupo:', err.message);
+    }
+  });
+
   // Mostra o QR code no terminal pra você escanear com o WhatsApp
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -118,6 +161,9 @@ async function iniciarBot() {
 
     const chatId = msg.key.remoteJid; // grupo ou conversa
     const isGroup = chatId.endsWith('@g.us');
+
+    // Grupo ainda pendente ou recusado: bot fica quieto, não processa nada nesse grupo
+    if (isGroup && estado.statusDoGrupo(chatId) !== 'autorizado') return;
 
     const remetenteId = msg.key.participant || msg.key.remoteJid;
     const nomeRemetente = contatosCache[remetenteId] || msg.pushName || remetenteId.split('@')[0];
@@ -193,6 +239,50 @@ async function iniciarBot() {
       '';
 
     if (!texto) return;
+
+    const remetenteBase = remetenteId.split('@')[0];
+    const ehAdmin = ADMIN_NUMBER && remetenteBase === ADMIN_NUMBER;
+
+    // Se quem mandou é o admin, no privado, e tem um grupo esperando autorização
+    if (!isGroup && ehAdmin) {
+      const grupoPendente = estado.proximoDaFila();
+      if (grupoPendente) {
+        const resposta = texto.trim().toLowerCase();
+        const respostasSim = ['sim', 's', 'autorizo', 'autorizado', 'pode', 'aceito', 'ok'];
+        const respostasNao = ['não', 'nao', 'n', 'negar', 'negado', 'recusar', 'recuso'];
+
+        if (respostasSim.includes(resposta)) {
+          estado.definirStatusGrupo(grupoPendente, 'autorizado');
+          estado.removerDaFila(grupoPendente);
+          try {
+            await sock.sendMessage(grupoPendente, { text: MENSAGEM_GRUPO_ATIVADO });
+          } catch (err) {
+            console.log('Erro ao avisar grupo autorizado:', err.message);
+          }
+          await sock.sendMessage(chatId, { text: '✅ Autorizado! Já ativei minhas funções nesse grupo.' });
+          return;
+        }
+
+        if (respostasNao.includes(resposta)) {
+          estado.definirStatusGrupo(grupoPendente, 'negado');
+          estado.removerDaFila(grupoPendente);
+          try {
+            await sock.sendMessage(grupoPendente, { text: MENSAGEM_GRUPO_RECUSADO });
+            await sock.groupLeave(grupoPendente);
+          } catch (err) {
+            console.log('Erro ao sair do grupo:', err.message);
+          }
+          await sock.sendMessage(chatId, { text: '🚫 Beleza, saí do grupo.' });
+          return;
+        }
+      }
+    }
+
+    // Primeira mensagem de alguém no privado: manda a apresentação, uma única vez
+    if (!isGroup && !estado.jaRecebeuBoasVindas(remetenteId)) {
+      estado.marcarBoasVindas(remetenteId);
+      await sock.sendMessage(chatId, { text: MENSAGEM_BOAS_VINDAS_PV });
+    }
 
     // Se a pessoa tá escolhendo o formato de uma figurinha pendente
     if (aguardandoEscolhaFormato[chaveEspera]) {
