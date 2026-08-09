@@ -47,6 +47,13 @@ function statusDoGrupo(chatId) {
   return estado.gruposStatus[chatId] || 'autorizado';
 }
 
+// Diz se esse grupo já teve status registrado alguma vez (autorizado, pendente ou negado),
+// pra não pedir autorização de novo pra um grupo que já foi processado antes
+function temStatusRegistrado(chatId) {
+  const estado = carregarEstado();
+  return Object.prototype.hasOwnProperty.call(estado.gruposStatus, chatId);
+}
+
 function definirStatusGrupo(chatId, status) {
   const estado = carregarEstado();
   estado.gruposStatus[chatId] = status;
@@ -75,6 +82,7 @@ module.exports = {
   jaRecebeuBoasVindas,
   marcarBoasVindas,
   statusDoGrupo,
+  temStatusRegistrado,
   definirStatusGrupo,
   adicionarNaFila,
   proximoDaFila,
