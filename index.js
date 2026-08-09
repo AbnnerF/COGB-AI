@@ -12,6 +12,8 @@ const {
   gerarFigurinha,
   criarFigurinhaDeImagem,
   criarFigurinhaAnimada,
+  converterFigurinhaParaImagem,
+  converterFigurinhaParaVideo,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
@@ -19,6 +21,7 @@ const {
 } = require('./sticker');
 const {
   MENSAGEM_BOAS_VINDAS_PV,
+  MENSAGEM_NOVA_FUNCAO_CONVERT,
   MENSAGEM_GRUPO_ATIVADO,
   MENSAGEM_GRUPO_PENDENTE,
   MENSAGEM_GRUPO_RECUSADO,
@@ -43,6 +46,9 @@ const aguardandoFoto = {};
 
 // Guarda quem já mandou uma foto desproporcional e tá esperando escolher o formato
 const aguardandoEscolhaFormato = {}; // chave -> { bufferImagem, legenda, timeoutHandle }
+
+// Guarda quem pediu "/convert" e tá esperando mandar a figurinha
+const aguardandoConversao = {}; // chave -> timeoutHandle
 
 // Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
 const contatosCache = {};
@@ -231,6 +237,33 @@ async function iniciarBot() {
       return;
     }
 
+    // Se a pessoa já tinha pedido "/convert" e agora mandou a figurinha
+    if (msg.message.stickerMessage && aguardandoConversao[chaveEspera]) {
+      clearTimeout(aguardandoConversao[chaveEspera]);
+      delete aguardandoConversao[chaveEspera];
+
+      const ehAnimada = Boolean(msg.message.stickerMessage.isAnimated);
+      const bufferFigurinha = await downloadMediaMessage(msg, 'buffer', {});
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema se não conseguir mostrar "digitando"
+      }
+
+      const resultado = ehAnimada
+        ? await converterFigurinhaParaVideo(bufferFigurinha)
+        : await converterFigurinhaParaImagem(bufferFigurinha);
+
+      if (!resultado) {
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra converter essa figurinha 😕 tenta de novo' });
+        return;
+      }
+
+      await enviarMsg(sock, chatId, ehAnimada ? { video: resultado } : { image: resultado });
+      return;
+    }
+
     // Se a pessoa já tinha pedido "/Create fig" e agora mandou uma foto, vídeo ou GIF
     if ((msg.message.imageMessage || msg.message.videoMessage) && aguardandoFoto[chaveEspera]) {
       clearTimeout(aguardandoFoto[chaveEspera]);
@@ -366,10 +399,17 @@ async function iniciarBot() {
       }
     }
 
-    // Primeira mensagem de alguém no privado: manda a apresentação, uma única vez
-    if (!isGroup && !estado.jaRecebeuBoasVindas(remetenteId)) {
-      estado.marcarBoasVindas(remetenteId);
-      await enviarMsg(sock, chatId, { text: MENSAGEM_BOAS_VINDAS_PV });
+    // Primeira mensagem de alguém no privado: manda a apresentação, uma única vez.
+    // Quem já conhecia o bot (recebeu a apresentação antiga) recebe o aviso da função nova, também uma vez.
+    if (!isGroup) {
+      if (!estado.jaRecebeuBoasVindas(remetenteId)) {
+        estado.marcarBoasVindas(remetenteId);
+        estado.marcarAvisoConvert(remetenteId); // a apresentação nova já fala do /convert
+        await enviarMsg(sock, chatId, { text: MENSAGEM_BOAS_VINDAS_PV });
+      } else if (!estado.jaFoiAvisadoConvert(remetenteId)) {
+        estado.marcarAvisoConvert(remetenteId);
+        await enviarMsg(sock, chatId, { text: MENSAGEM_NOVA_FUNCAO_CONVERT });
+      }
     }
 
     // Se a pessoa tá escolhendo o formato de uma figurinha pendente
@@ -409,6 +449,18 @@ async function iniciarBot() {
       }
 
       await enviarMsg(sock, chatId, { sticker: figurinha });
+      return;
+    }
+
+    // Comando /convert - pede pra pessoa mandar a figurinha (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase() === '/convert') {
+      aguardandoConversao[chaveEspera] = setTimeout(() => {
+        delete aguardandoConversao[chaveEspera];
+      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a figurinha
+
+      await enviarMsg(sock, chatId, {
+        text: 'Manda a figurinha que você quer converter! 🔄 Normal vira imagem, animada vira vídeo.',
+      });
       return;
     }
 
@@ -491,3 +543,4 @@ async function iniciarBot() {
 }
 
 iniciarBot();
+
