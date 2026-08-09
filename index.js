@@ -101,7 +101,27 @@ async function iniciarBot() {
   sock.ev.on('contacts.upsert', (contatos) => contatos.forEach(salvarContato));
   sock.ev.on('contacts.update', (contatos) => contatos.forEach(salvarContato));
 
-  // Detecta quando o bot é adicionado a um grupo (ou comunidade), e pede autorização ao admin
+  // Pede autorização ao admin quando o bot é adicionado a um grupo (ou entra num criado agora)
+  async function pedirAutorizacaoDoGrupo(chatId, nomeGrupo) {
+    if (estado.temStatusRegistrado(chatId)) return; // já processado antes, não pede de novo
+
+    estado.definirStatusGrupo(chatId, 'pendente');
+    estado.adicionarNaFila(chatId);
+
+    try {
+      await sock.sendMessage(chatId, { text: MENSAGEM_GRUPO_PENDENTE });
+    } catch (err) {
+      console.log('Erro ao avisar grupo pendente:', err.message);
+    }
+
+    if (ADMIN_NUMBER) {
+      await sock.sendMessage(`${ADMIN_NUMBER}@s.whatsapp.net`, {
+        text: `🤖 Fui adicionado no grupo *"${nomeGrupo}"*.\n\nPermite minha entrada nesse grupo? Responda *SIM* ou *NÃO*.`,
+      });
+    }
+  }
+
+  // Caso 1: bot adicionado a um grupo que já existia
   sock.ev.on('group-participants.update', async (evento) => {
     try {
       if (evento.action !== 'add') return;
@@ -110,28 +130,36 @@ async function iniciarBot() {
       const botFoiAdicionado = evento.participants.some((p) => p.split('@')[0] === botBase);
       if (!botFoiAdicionado) return;
 
-      const chatId = evento.id;
-
-      estado.definirStatusGrupo(chatId, 'pendente');
-      estado.adicionarNaFila(chatId);
-
-      await sock.sendMessage(chatId, { text: MENSAGEM_GRUPO_PENDENTE });
-
-      if (ADMIN_NUMBER) {
-        let nomeGrupo = 'um grupo';
-        try {
-          const metadata = await sock.groupMetadata(chatId);
-          nomeGrupo = metadata.subject || nomeGrupo;
-        } catch (err) {
-          // sem problema se não conseguir pegar o nome
-        }
-
-        await sock.sendMessage(`${ADMIN_NUMBER}@s.whatsapp.net`, {
-          text: `🤖 Fui adicionado no grupo *"${nomeGrupo}"*.\n\nPermite minha entrada nesse grupo? Responda *SIM* ou *NÃO*.`,
-        });
+      let nomeGrupo = 'um grupo';
+      try {
+        const metadata = await sock.groupMetadata(evento.id);
+        nomeGrupo = metadata.subject || nomeGrupo;
+      } catch (err) {
+        // sem problema se não conseguir pegar o nome
       }
+
+      await pedirAutorizacaoDoGrupo(evento.id, nomeGrupo);
     } catch (err) {
       console.log('Erro ao processar entrada em grupo:', err.message);
+    }
+  });
+
+  // Caso 2: bot já entra num grupo recém-criado (o criador já bota o bot como membro inicial)
+  sock.ev.on('groups.upsert', async (grupos) => {
+    for (const grupo of grupos) {
+      try {
+        const chatId = grupo.id;
+        if (estado.temStatusRegistrado(chatId)) continue; // já conhecido, ignora
+
+        // só trata como "acabou de entrar" se o grupo foi criado há pouco tempo
+        // (evita disparar autorização de novo pra grupos antigos sincronizados ao conectar)
+        const criadoRecentemente = grupo.creation && Date.now() / 1000 - grupo.creation < 120;
+        if (!criadoRecentemente) continue;
+
+        await pedirAutorizacaoDoGrupo(chatId, grupo.subject || 'um grupo');
+      } catch (err) {
+        console.log('Erro ao processar grupo novo:', err.message);
+      }
     }
   });
 
@@ -402,3 +430,4 @@ async function iniciarBot() {
 }
 
 iniciarBot();
+
