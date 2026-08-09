@@ -175,10 +175,60 @@ async function criarFigurinhaAnimada(bufferVideo, legenda, modo = 'recortada') {
   }
 }
 
+/**
+ * Converte uma figurinha estática (webp) numa imagem comum (png).
+ * Retorna um Buffer com a imagem, ou null se der algum erro.
+ */
+async function converterFigurinhaParaImagem(bufferWebp) {
+  garantirPastaTemp();
+  const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.webp`);
+  const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.png`);
+
+  try {
+    fs.writeFileSync(caminhoEntrada, bufferWebp);
+    await execAsync(`ffmpeg -y -i "${caminhoEntrada}" "${caminhoSaida}"`);
+    return fs.readFileSync(caminhoSaida);
+  } catch (err) {
+    console.log('Erro ao converter figurinha em imagem:', err.message);
+    return null;
+  } finally {
+    if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
+    if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
+  }
+}
+
+/**
+ * Converte uma figurinha animada (webp animado) num vídeo (mp4).
+ * Retorna um Buffer com o vídeo, ou null se der algum erro.
+ */
+async function converterFigurinhaParaVideo(bufferWebp) {
+  garantirPastaTemp();
+  const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.webp`);
+  const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.mp4`);
+
+  try {
+    fs.writeFileSync(caminhoEntrada, bufferWebp);
+    await execAsync(
+      `ffmpeg -y -i "${caminhoEntrada}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${caminhoSaida}"`
+    );
+    return fs.readFileSync(caminhoSaida);
+  } catch (err) {
+    console.log('Erro ao converter figurinha em vídeo:', err.message);
+    return null;
+  } finally {
+    if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
+    if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
+  }
+}
+
 module.exports = {
   gerarFigurinha,
   criarFigurinhaDeImagem,
   criarFigurinhaAnimada,
+  converterFigurinhaParaImagem,
+  converterFigurinhaParaVideo,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
