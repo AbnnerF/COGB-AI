@@ -59,9 +59,9 @@ function limparMencoes(texto) {
   return texto.replace(/@\d+/g, '').trim();
 }
 
-// Espera 3 segundos antes de mandar uma mensagem, pra não parecer instantâneo/robótico
+// Espera 1 segundo antes de mandar uma mensagem, pra não parecer instantâneo/robótico
 async function enviarMsg(sock, chatId, conteudo) {
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+  await new Promise((resolve) => setTimeout(resolve, 1000));
   await sock.sendMessage(chatId, conteudo);
 }
 
@@ -120,9 +120,15 @@ async function iniciarBot() {
     }
 
     if (ADMIN_NUMBER) {
-      await enviarMsg(sock, `${ADMIN_NUMBER}@s.whatsapp.net`, {
-        text: `🤖 Fui adicionado no grupo *"${nomeGrupo}"*.\n\nPermite minha entrada nesse grupo? Responda *SIM* ou *NÃO*.`,
-      });
+      try {
+        await enviarMsg(sock, `${ADMIN_NUMBER}@s.whatsapp.net`, {
+          text: `🤖 Fui adicionado no grupo *"${nomeGrupo}"*.\n\nPermite minha entrada nesse grupo? Responda *SIM* ou *NÃO*.`,
+        });
+      } catch (err) {
+        console.log('Erro ao mandar DM de autorização pro admin:', err.message);
+      }
+    } else {
+      console.log('ADMIN_NUMBER não está configurado no .env — não dá pra pedir autorização por DM.');
     }
   }
 
