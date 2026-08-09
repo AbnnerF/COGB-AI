@@ -9,14 +9,20 @@ function garantirArquivo() {
   if (!fs.existsSync(ARQUIVO_ESTADO)) {
     fs.writeFileSync(
       ARQUIVO_ESTADO,
-      JSON.stringify({ contatosBoasVindas: [], gruposStatus: {}, filaAutorizacao: [] }, null, 2)
+      JSON.stringify(
+        { contatosBoasVindas: [], contatosAvisadosConvert: [], gruposStatus: {}, filaAutorizacao: [] },
+        null,
+        2
+      )
     );
   }
 }
 
 function carregarEstado() {
   garantirArquivo();
-  return JSON.parse(fs.readFileSync(ARQUIVO_ESTADO, 'utf-8'));
+  const dados = JSON.parse(fs.readFileSync(ARQUIVO_ESTADO, 'utf-8'));
+  if (!dados.contatosAvisadosConvert) dados.contatosAvisadosConvert = []; // compatibilidade com estado antigo
+  return dados;
 }
 
 function salvarEstado(estado) {
@@ -34,6 +40,20 @@ function marcarBoasVindas(id) {
   const estado = carregarEstado();
   if (!estado.contatosBoasVindas.includes(id)) {
     estado.contatosBoasVindas.push(id);
+    salvarEstado(estado);
+  }
+}
+
+// --- Aviso da função /convert (uma vez por pessoa) ---
+
+function jaFoiAvisadoConvert(id) {
+  return carregarEstado().contatosAvisadosConvert.includes(id);
+}
+
+function marcarAvisoConvert(id) {
+  const estado = carregarEstado();
+  if (!estado.contatosAvisadosConvert.includes(id)) {
+    estado.contatosAvisadosConvert.push(id);
     salvarEstado(estado);
   }
 }
@@ -81,6 +101,8 @@ function removerDaFila(chatId) {
 module.exports = {
   jaRecebeuBoasVindas,
   marcarBoasVindas,
+  jaFoiAvisadoConvert,
+  marcarAvisoConvert,
   statusDoGrupo,
   temStatusRegistrado,
   definirStatusGrupo,
