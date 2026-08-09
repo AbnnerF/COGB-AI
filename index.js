@@ -204,6 +204,27 @@ async function iniciarBot() {
 
     const chaveEspera = `${chatId}:${remetenteId}`;
 
+    // Convite de grupo nativo (aquele card "Convite para grupo") mandado no privado do bot
+    if (!isGroup && msg.message.groupInviteMessage) {
+      const convite = msg.message.groupInviteMessage;
+      const grupoJid = convite.groupJid;
+      const nomeGrupo = convite.groupName || 'um grupo';
+
+      try {
+        await sock.groupAcceptInviteV4(remetenteId, convite);
+        await pedirAutorizacaoDoGrupo(grupoJid, nomeGrupo);
+        await enviarMsg(sock, chatId, {
+          text: `✅ Entrei no grupo *"${nomeGrupo}"*! Vou pedir autorização antes de ativar minhas funções lá.`,
+        });
+      } catch (err) {
+        console.log('Erro ao entrar no grupo via convite:', err.message);
+        await enviarMsg(sock, chatId, {
+          text: '❌ Não consegui entrar nesse grupo pelo convite. Ele pode estar expirado ou eu já fui removido de lá antes.',
+        });
+      }
+      return;
+    }
+
     // Se a pessoa já tinha pedido "/Create fig" e agora mandou uma foto, vídeo ou GIF
     if ((msg.message.imageMessage || msg.message.videoMessage) && aguardandoFoto[chaveEspera]) {
       clearTimeout(aguardandoFoto[chaveEspera]);
@@ -464,4 +485,3 @@ async function iniciarBot() {
 }
 
 iniciarBot();
-
