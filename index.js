@@ -26,7 +26,6 @@ const {
 const estado = require('./estado');
 
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // número que autoriza o bot em novos grupos, ex: 5511999999999
-
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
 
 // Quanto tempo (em ms) o bot continua "no papo" depois da última mensagem, sem precisar ser chamado de novo
@@ -60,7 +59,13 @@ function limparMencoes(texto) {
   return texto.replace(/@\d+/g, '').trim();
 }
 
-// Espera um tempo (parecendo "digitando...") antes de mandar a mensagem, pra ficar mais natural
+// Espera 3 segundos antes de mandar uma mensagem, pra não parecer instantâneo/robótico
+async function enviarMsg(sock, chatId, conteudo) {
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  await sock.sendMessage(chatId, conteudo);
+}
+
+// Espera um tempo (parecendo "digitando...") antes de mandar a mensagem do chat casual (/Bot)
 async function enviarComAtraso(sock, chatId, texto) {
   const atrasoMs = 2000 + Math.random() * 4000; // entre 2 e 6 segundos
   try {
@@ -109,13 +114,13 @@ async function iniciarBot() {
     estado.adicionarNaFila(chatId);
 
     try {
-      await sock.sendMessage(chatId, { text: MENSAGEM_GRUPO_PENDENTE });
+      await enviarMsg(sock, chatId, { text: MENSAGEM_GRUPO_PENDENTE });
     } catch (err) {
       console.log('Erro ao avisar grupo pendente:', err.message);
     }
 
     if (ADMIN_NUMBER) {
-      await sock.sendMessage(`${ADMIN_NUMBER}@s.whatsapp.net`, {
+      await enviarMsg(sock, `${ADMIN_NUMBER}@s.whatsapp.net`, {
         text: `🤖 Fui adicionado no grupo *"${nomeGrupo}"*.\n\nPermite minha entrada nesse grupo? Responda *SIM* ou *NÃO*.`,
       });
     }
@@ -212,7 +217,7 @@ async function iniciarBot() {
       if (ehVideo && !msg.message.videoMessage.gifPlayback) {
         const duracao = await obterDuracao(bufferMidia).catch(() => null);
         if (duracao && duracao > DURACAO_MAXIMA_FIGURINHA) {
-          await sock.sendMessage(chatId, {
+          await enviarMsg(sock, chatId, {
             text: `Esse vídeo tem ${duracao.toFixed(1)}s, mas figurinha animada só aguenta até ${DURACAO_MAXIMA_FIGURINHA}s — vou cortar e usar só o começo dele.`,
           });
         }
@@ -231,7 +236,7 @@ async function iniciarBot() {
           }, 5 * 60 * 1000),
         };
 
-        await sock.sendMessage(chatId, {
+        await enviarMsg(sock, chatId, {
           text:
             `Essa ${ehVideo ? 'mídia' : 'imagem'} não é quadrada! Como você quer a figurinha?\n\n` +
             '1️⃣ Recortada — corta as bordas pra preencher tudo\n' +
@@ -253,11 +258,11 @@ async function iniciarBot() {
         : await criarFigurinhaDeImagem(bufferMidia, legenda);
 
       if (!figurinha) {
-        await sock.sendMessage(chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
         return;
       }
 
-      await sock.sendMessage(chatId, { sticker: figurinha });
+      await enviarMsg(sock, chatId, { sticker: figurinha });
       return;
     }
 
@@ -267,6 +272,34 @@ async function iniciarBot() {
       '';
 
     if (!texto) return;
+
+    // Link de convite de grupo mandado no privado: o bot entra sozinho no grupo
+    const linkConvite = !isGroup && texto.match(/chat\.whatsapp\.com\/([A-Za-z0-9]+)/);
+    if (linkConvite) {
+      const codigo = linkConvite[1];
+      try {
+        const novoGrupoId = await sock.groupAcceptInvite(codigo);
+
+        let nomeGrupo = 'um grupo';
+        try {
+          const metadata = await sock.groupMetadata(novoGrupoId);
+          nomeGrupo = metadata.subject || nomeGrupo;
+        } catch (err) {
+          // sem problema se não conseguir pegar o nome
+        }
+
+        await pedirAutorizacaoDoGrupo(novoGrupoId, nomeGrupo);
+        await enviarMsg(sock, chatId, {
+          text: `✅ Entrei no grupo *"${nomeGrupo}"*! Vou pedir autorização antes de ativar minhas funções lá.`,
+        });
+      } catch (err) {
+        console.log('Erro ao entrar no grupo via link:', err.message);
+        await enviarMsg(sock, chatId, {
+          text: '❌ Não consegui entrar nesse grupo. O link pode estar errado, expirado, ou eu já fui removido de lá antes.',
+        });
+      }
+      return;
+    }
 
     const remetenteBase = remetenteId.split('@')[0];
     const ehAdmin = ADMIN_NUMBER && remetenteBase === ADMIN_NUMBER;
@@ -283,11 +316,11 @@ async function iniciarBot() {
           estado.definirStatusGrupo(grupoPendente, 'autorizado');
           estado.removerDaFila(grupoPendente);
           try {
-            await sock.sendMessage(grupoPendente, { text: MENSAGEM_GRUPO_ATIVADO });
+            await enviarMsg(sock, grupoPendente, { text: MENSAGEM_GRUPO_ATIVADO });
           } catch (err) {
             console.log('Erro ao avisar grupo autorizado:', err.message);
           }
-          await sock.sendMessage(chatId, { text: '✅ Autorizado! Já ativei minhas funções nesse grupo.' });
+          await enviarMsg(sock, chatId, { text: '✅ Autorizado! Já ativei minhas funções nesse grupo.' });
           return;
         }
 
@@ -295,12 +328,12 @@ async function iniciarBot() {
           estado.definirStatusGrupo(grupoPendente, 'negado');
           estado.removerDaFila(grupoPendente);
           try {
-            await sock.sendMessage(grupoPendente, { text: MENSAGEM_GRUPO_RECUSADO });
+            await enviarMsg(sock, grupoPendente, { text: MENSAGEM_GRUPO_RECUSADO });
             await sock.groupLeave(grupoPendente);
           } catch (err) {
             console.log('Erro ao sair do grupo:', err.message);
           }
-          await sock.sendMessage(chatId, { text: '🚫 Beleza, saí do grupo.' });
+          await enviarMsg(sock, chatId, { text: '🚫 Beleza, saí do grupo.' });
           return;
         }
       }
@@ -309,7 +342,7 @@ async function iniciarBot() {
     // Primeira mensagem de alguém no privado: manda a apresentação, uma única vez
     if (!isGroup && !estado.jaRecebeuBoasVindas(remetenteId)) {
       estado.marcarBoasVindas(remetenteId);
-      await sock.sendMessage(chatId, { text: MENSAGEM_BOAS_VINDAS_PV });
+      await enviarMsg(sock, chatId, { text: MENSAGEM_BOAS_VINDAS_PV });
     }
 
     // Se a pessoa tá escolhendo o formato de uma figurinha pendente
@@ -323,7 +356,7 @@ async function iniciarBot() {
       const modo = mapaEscolhas[escolha];
 
       if (!modo) {
-        await sock.sendMessage(chatId, {
+        await enviarMsg(sock, chatId, {
           text: 'Não entendi 😅 responde com 1, 2 ou 3 (ou o nome da opção: recortada, original, esticada).',
         });
         return;
@@ -344,11 +377,11 @@ async function iniciarBot() {
         : await criarFigurinhaDeImagem(pendente.bufferImagem, pendente.legenda, modo);
 
       if (!figurinha) {
-        await sock.sendMessage(chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
         return;
       }
 
-      await sock.sendMessage(chatId, { sticker: figurinha });
+      await enviarMsg(sock, chatId, { sticker: figurinha });
       return;
     }
 
@@ -358,7 +391,7 @@ async function iniciarBot() {
         delete aguardandoFoto[chaveEspera];
       }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a foto
 
-      await sock.sendMessage(chatId, {
+      await enviarMsg(sock, chatId, {
         text: `Manda a foto, vídeo ou GIF aí! 📸 Se quiser, coloca uma legenda — isso vira o nome da figurinha. (vídeos com mais de ${DURACAO_MAXIMA_FIGURINHA}s são cortados automaticamente)`,
       });
       return;
@@ -368,7 +401,7 @@ async function iniciarBot() {
     if (texto.trim().toLowerCase().startsWith('/fig ')) {
       const descricao = texto.trim().slice(5).trim();
       if (!descricao) {
-        await sock.sendMessage(chatId, { text: 'Descreve o que você quer na figurinha! Ex: /fig gato astronauta' });
+        await enviarMsg(sock, chatId, { text: 'Descreve o que você quer na figurinha! Ex: /fig gato astronauta' });
         return;
       }
 
@@ -380,11 +413,11 @@ async function iniciarBot() {
 
       const figurinha = await gerarFigurinha(descricao);
       if (!figurinha) {
-        await sock.sendMessage(chatId, { text: 'Deu ruim pra gerar a figurinha agora 😕 tenta de novo' });
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra gerar a figurinha agora 😕 tenta de novo' });
         return;
       }
 
-      await sock.sendMessage(chatId, { sticker: figurinha });
+      await enviarMsg(sock, chatId, { sticker: figurinha });
       return;
     }
 
@@ -404,6 +437,7 @@ async function iniciarBot() {
     }, TEMPO_INATIVIDADE_MS);
 
     // Quando é só o comando de ativação, começa um histórico novo e manda uma saudação
+    // (esse fluxo já tem seu próprio atraso de "digitando", por isso fica fora do enviarMsg de 3s fixos)
     if (comandoAtivar) {
       historicoConversas[chatId] = [];
       const saudacao = await gerarResposta([
