@@ -3,20 +3,51 @@ const MENSAGEM_BOAS_VINDAS_PV = `🤖✨ OLÁ! EU SOU O CHAIM-BOT! ✨🤖
 👋 Prazer! Eu sou o Chaim-Bot, um bot de WhatsApp feito para deixar suas conversas muito mais divertidas! 📱💙
 
 🎨 MINHAS FUNÇÕES:
-🖼️ Criação de figurinhas
-🎞️ Figurinhas animadas
+
+🖼️ Criar figurinhas a partir de imagens
+🎞️ Criar figurinhas animadas a partir de vídeos
+🔄 Converter figurinhas normais em imagens
+🎬 Converter figurinhas animadas em vídeos
 ✨ Recorte e remoção de fundo
 🔧 Correção e melhorias nas figurinhas
-👥 Posso funcionar tanto em PV quanto em grupos!
+👥 Funcionamento em PV e grupos!
 
 ⚙️ COMO CRIAR UMA FIGURINHA?
 
 É simples! 😎
-Envie uma imagem ou vídeo e use o comando:
+
+Primeiro, use o comando:
 
 👉 /create fig
 
+📸 Depois, envie a imagem ou vídeo que deseja transformar em figurinha.
+
 🤖 O Chaim-Bot faz o resto!
+
+🔄 E QUER CONVERTER UMA FIGURINHA?
+
+Também dá! 😎
+
+Você pode converter:
+🖼️ Figurinha normal → Imagem
+🎞️ Figurinha animada → Vídeo
+
+🔄 COMO CONVERTER UMA FIGURINHA?
+
+É simples! 😎
+
+Primeiro, use o comando:
+
+👉 /convert
+
+📸 Depois, envie a figurinha que deseja converter.
+
+🖼️ Figurinha normal → Imagem
+🎞️ Figurinha animada → Vídeo
+
+🤖 O Chaim-Bot faz o resto! ✨
+
+🚀 MAIS FUNÇÕES ESTÃO POR VIR!
 
 👥 QUER O CHAIM-BOT NO SEU GRUPO?
 
@@ -24,7 +55,27 @@ Se quiser convidar o Chaim-Bot para ser o bot do seu grupo, entre em contato pel
 
 📞 +55 65 99679-9870
 
-🚀 CHAIM-BOT — seu bot de figurinhas! 💙`;
+💙 CHAIM-BOT — seu bot de figurinhas e conversões! 🤖✨`;
+
+const MENSAGEM_NOVA_FUNCAO_CONVERT = `🎉🤖 NOVA FUNÇÃO NO CHAIM-BOT!
+
+🚀 Hoje o Chaim-Bot ganhou uma nova função!
+
+🔄 /convert acaba de ser lançado! ✨
+
+Agora você pode converter suas figurinhas facilmente:
+
+🖼️ Figurinha normal → Imagem
+🎞️ Figurinha animada → Vídeo
+
+📌 Como usar:
+1️⃣ Digite /convert
+2️⃣ Depois envie a figurinha
+3️⃣ O Chaim-Bot fará a conversão! 🤖✨
+
+🔥 /convert — NOVO no Chaim-Bot!
+
+💙 Aproveitem a nova função!`;
 
 const MENSAGEM_GRUPO_ATIVADO = `🤖✨ Olá, pessoal!
 
@@ -68,6 +119,7 @@ Vou sair agora. Até mais! 👋`;
 
 module.exports = {
   MENSAGEM_BOAS_VINDAS_PV,
+  MENSAGEM_NOVA_FUNCAO_CONVERT,
   MENSAGEM_GRUPO_ATIVADO,
   MENSAGEM_GRUPO_PENDENTE,
   MENSAGEM_GRUPO_RECUSADO,
