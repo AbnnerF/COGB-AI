@@ -187,7 +187,7 @@ async function converterFigurinhaParaImagem(bufferWebp) {
 
   try {
     fs.writeFileSync(caminhoEntrada, bufferWebp);
-    await execAsync(`ffmpeg -y -i "${caminhoEntrada}" "${caminhoSaida}"`);
+    await execAsync(`dwebp "${caminhoEntrada}" -o "${caminhoSaida}"`);
     return fs.readFileSync(caminhoSaida);
   } catch (err) {
     console.log('Erro ao converter figurinha em imagem:', err.message);
@@ -200,19 +200,46 @@ async function converterFigurinhaParaImagem(bufferWebp) {
 
 /**
  * Converte uma figurinha animada (webp animado) num vídeo (mp4).
+ * O ffmpeg do Termux não sabe ler figurinha animada direto, então a gente usa o webpmux
+ * pra separar cada quadro, o dwebp pra decodificar cada um em PNG, e só então o ffmpeg
+ * monta o vídeo com a sequência de PNGs.
  * Retorna um Buffer com o vídeo, ou null se der algum erro.
  */
 async function converterFigurinhaParaVideo(bufferWebp) {
   garantirPastaTemp();
-  const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-  const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.webp`);
-  const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.mp4`);
+  const idPasta = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const pastaFrames = path.join(PASTA_TEMP, `frames-${idPasta}`);
+  const caminhoEntrada = path.join(PASTA_TEMP, `${idPasta}.webp`);
+  const caminhoSaida = path.join(PASTA_TEMP, `${idPasta}.mp4`);
 
   try {
+    fs.mkdirSync(pastaFrames, { recursive: true });
     fs.writeFileSync(caminhoEntrada, bufferWebp);
+
+    // Descobre quantos quadros a figurinha tem
+    const { stdout: info } = await execAsync(`webpmux -info "${caminhoEntrada}"`);
+    const match = info.match(/Number of frames:\s*(\d+)/i);
+    const totalQuadros = match ? parseInt(match[1], 10) : 0;
+
+    if (!totalQuadros) {
+      console.log('Não encontrei quadros nessa figurinha (webpmux -info):', info);
+      return null;
+    }
+
+    // Extrai cada quadro (webpmux) e decodifica pra PNG (dwebp)
+    for (let i = 1; i <= totalQuadros; i++) {
+      const quadroWebp = path.join(pastaFrames, `q${i}.webp`);
+      const quadroPng = path.join(pastaFrames, `q${String(i).padStart(4, '0')}.png`);
+      await execAsync(`webpmux -get frame ${i} "${caminhoEntrada}" -o "${quadroWebp}"`);
+      await execAsync(`dwebp "${quadroWebp}" -o "${quadroPng}"`);
+    }
+
+    // Monta o vídeo a partir da sequência de PNGs
     await execAsync(
-      `ffmpeg -y -i "${caminhoEntrada}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${caminhoSaida}"`
+      `ffmpeg -y -framerate 15 -i "${pastaFrames}/q%04d.png" -movflags faststart -pix_fmt yuv420p ` +
+        `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${caminhoSaida}"`
     );
+
     return fs.readFileSync(caminhoSaida);
   } catch (err) {
     console.log('Erro ao converter figurinha em vídeo:', err.message);
@@ -220,6 +247,7 @@ async function converterFigurinhaParaVideo(bufferWebp) {
   } finally {
     if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
     if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
+    if (fs.existsSync(pastaFrames)) fs.rmSync(pastaFrames, { recursive: true, force: true });
   }
 }
 
