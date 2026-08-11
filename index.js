@@ -14,6 +14,7 @@ const {
   criarFigurinhaAnimada,
   converterFigurinhaParaImagem,
   converterFigurinhaParaVideo,
+  converterVideoParaAudio,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
@@ -49,6 +50,9 @@ const aguardandoEscolhaFormato = {}; // chave -> { bufferImagem, legenda, timeou
 
 // Guarda quem pediu "/convert" e tá esperando mandar a figurinha
 const aguardandoConversao = {}; // chave -> timeoutHandle
+
+// Guarda quem pediu "/audio" e tá esperando mandar o vídeo
+const aguardandoAudio = {}; // chave -> timeoutHandle
 
 // Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
 const contatosCache = {};
@@ -111,6 +115,28 @@ async function iniciarBot() {
   // Vai guardando os nomes reais dos contatos conforme o WhatsApp sincroniza
   sock.ev.on('contacts.upsert', (contatos) => contatos.forEach(salvarContato));
   sock.ev.on('contacts.update', (contatos) => contatos.forEach(salvarContato));
+
+  // Monta um relatório com todos os grupos conhecidos e o status de cada um
+  async function gerarRelatorioGrupos() {
+    const grupos = estado.listarGrupos();
+    const entradas = Object.entries(grupos);
+
+    if (entradas.length === 0) return '📋 Nenhum grupo registrado ainda.';
+
+    let texto = '📋 *Grupos conhecidos:*\n\n';
+    for (const [idGrupo, status] of entradas) {
+      let nome = idGrupo;
+      try {
+        const metadata = await sock.groupMetadata(idGrupo);
+        nome = metadata.subject || idGrupo;
+      } catch (err) {
+        // grupo pode ter sido apagado ou o bot removido de lá
+      }
+      const emoji = status === 'autorizado' ? '✅' : status === 'negado' ? '🚫' : '⏳';
+      texto += `${emoji} ${nome} — _${status}_\n`;
+    }
+    return texto;
+  }
 
   // Pede autorização ao admin quando o bot é adicionado a um grupo (ou entra num criado agora)
   async function pedirAutorizacaoDoGrupo(chatId, nomeGrupo) {
@@ -202,10 +228,28 @@ async function iniciarBot() {
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    if (!msg.message) return;
 
     const chatId = msg.key.remoteJid; // grupo ou conversa
     const isGroup = chatId.endsWith('@g.us');
+
+    // Comando especial: você (o dono) ativa um grupo pendente na mão, escrevendo
+    // "/Ligado" direto no grupo usando o próprio WhatsApp Business do número do bot
+    if (msg.key.fromMe) {
+      const textoProprio = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+      if (isGroup && textoProprio.trim().toLowerCase() === '/ligado') {
+        if (estado.statusDoGrupo(chatId) !== 'autorizado') {
+          estado.definirStatusGrupo(chatId, 'autorizado');
+          estado.removerDaFila(chatId);
+          try {
+            await enviarMsg(sock, chatId, { text: MENSAGEM_GRUPO_ATIVADO });
+          } catch (err) {
+            console.log('Erro ao ativar grupo manualmente:', err.message);
+          }
+        }
+      }
+      return; // ignora o resto das próprias mensagens do bot
+    }
 
     // Grupo ainda pendente ou recusado: bot fica quieto, não processa nada nesse grupo
     if (isGroup && estado.statusDoGrupo(chatId) !== 'autorizado') return;
@@ -261,6 +305,30 @@ async function iniciarBot() {
       }
 
       await enviarMsg(sock, chatId, ehAnimada ? { video: resultado } : { image: resultado });
+      return;
+    }
+
+    // Se a pessoa já tinha pedido "/audio" e agora mandou o vídeo
+    if (msg.message.videoMessage && aguardandoAudio[chaveEspera]) {
+      clearTimeout(aguardandoAudio[chaveEspera]);
+      delete aguardandoAudio[chaveEspera];
+
+      const bufferVideo = await downloadMediaMessage(msg, 'buffer', {});
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema se não conseguir mostrar "digitando"
+      }
+
+      const audio = await converterVideoParaAudio(bufferVideo);
+
+      if (!audio) {
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra extrair o áudio desse vídeo 😕 tenta de novo' });
+        return;
+      }
+
+      await enviarMsg(sock, chatId, { audio, mimetype: 'audio/mpeg' });
       return;
     }
 
@@ -332,6 +400,16 @@ async function iniciarBot() {
       '';
 
     if (!texto) return;
+
+    // Comando secreto: reconhece quem manda como o criador/dono do bot
+    if (!isGroup && texto.trim() === '/1480018122') {
+      estado.definirDono(remetenteId);
+      const relatorio = await gerarRelatorioGrupos();
+      await enviarMsg(sock, chatId, {
+        text: `👑 Prontinho! Agora eu te reconheço como meu criador.\n\n${relatorio}`,
+      });
+      return;
+    }
 
     // Link de convite de grupo mandado no privado: o bot entra sozinho no grupo
     const linkConvite = !isGroup && texto.match(/chat\.whatsapp\.com\/([A-Za-z0-9]+)/);
@@ -452,6 +530,16 @@ async function iniciarBot() {
       return;
     }
 
+    // Comando /audio - pede pra pessoa mandar o vídeo (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase() === '/audio') {
+      aguardandoAudio[chaveEspera] = setTimeout(() => {
+        delete aguardandoAudio[chaveEspera];
+      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar o vídeo
+
+      await enviarMsg(sock, chatId, { text: 'Manda o vídeo que você quer transformar em áudio! 🎬🎵' });
+      return;
+    }
+
     // Comando /convert - pede pra pessoa mandar a figurinha (funciona em grupo ou no privado)
     if (texto.trim().toLowerCase() === '/convert') {
       aguardandoConversao[chaveEspera] = setTimeout(() => {
@@ -543,4 +631,3 @@ async function iniciarBot() {
 }
 
 iniciarBot();
-
