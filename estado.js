@@ -10,7 +10,7 @@ function garantirArquivo() {
     fs.writeFileSync(
       ARQUIVO_ESTADO,
       JSON.stringify(
-        { contatosBoasVindas: [], contatosAvisadosConvert: [], gruposStatus: {}, filaAutorizacao: [] },
+        { contatosBoasVindas: [], contatosAvisadosConvert: [], gruposStatus: {}, filaAutorizacao: [], donoId: null },
         null,
         2
       )
@@ -22,6 +22,7 @@ function carregarEstado() {
   garantirArquivo();
   const dados = JSON.parse(fs.readFileSync(ARQUIVO_ESTADO, 'utf-8'));
   if (!dados.contatosAvisadosConvert) dados.contatosAvisadosConvert = []; // compatibilidade com estado antigo
+  if (dados.donoId === undefined) dados.donoId = null; // compatibilidade com estado antigo
   return dados;
 }
 
@@ -56,6 +57,18 @@ function marcarAvisoConvert(id) {
     estado.contatosAvisadosConvert.push(id);
     salvarEstado(estado);
   }
+}
+
+// --- Dono/criador do bot ---
+
+function definirDono(id) {
+  const estado = carregarEstado();
+  estado.donoId = id;
+  salvarEstado(estado);
+}
+
+function ehDono(id) {
+  return carregarEstado().donoId === id;
 }
 
 // --- Autorização de grupos ---
@@ -98,15 +111,22 @@ function removerDaFila(chatId) {
   salvarEstado(estado);
 }
 
+function listarGrupos() {
+  return carregarEstado().gruposStatus;
+}
+
 module.exports = {
   jaRecebeuBoasVindas,
   marcarBoasVindas,
   jaFoiAvisadoConvert,
   marcarAvisoConvert,
+  definirDono,
+  ehDono,
   statusDoGrupo,
   temStatusRegistrado,
   definirStatusGrupo,
   adicionarNaFila,
   proximoDaFila,
   removerDaFila,
+  listarGrupos,
 };
