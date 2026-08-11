@@ -251,12 +251,36 @@ async function converterFigurinhaParaVideo(bufferWebp) {
   }
 }
 
+/**
+ * Extrai o áudio de um vídeo, devolvendo um mp3.
+ * Retorna um Buffer com o áudio, ou null se der algum erro.
+ */
+async function converterVideoParaAudio(bufferVideo) {
+  garantirPastaTemp();
+  const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.mp4`);
+  const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.mp3`);
+
+  try {
+    fs.writeFileSync(caminhoEntrada, bufferVideo);
+    await execAsync(`ffmpeg -y -i "${caminhoEntrada}" -vn -acodec libmp3lame -q:a 2 "${caminhoSaida}"`);
+    return fs.readFileSync(caminhoSaida);
+  } catch (err) {
+    console.log('Erro ao converter vídeo em áudio:', err.message);
+    return null;
+  } finally {
+    if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
+    if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
+  }
+}
+
 module.exports = {
   gerarFigurinha,
   criarFigurinhaDeImagem,
   criarFigurinhaAnimada,
   converterFigurinhaParaImagem,
   converterFigurinhaParaVideo,
+  converterVideoParaAudio,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
