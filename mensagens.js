@@ -93,9 +93,49 @@ Eu sou o Chaim-Bot, o novo bot de vocês! 💙
 
 Também posso criar figurinhas animadas! 🎞️🔥
 
+📋 Digite */menu* pra ver tudo que eu sei fazer!
+
 👥 Espero me divertir bastante com vocês!
 
 ⚡ Chaim-Bot — agora fazendo parte do grupo! 🤖💙`;
+
+const MENSAGEM_MENU = `📋🤖 MENU — CHAIM-BOT
+
+Olha tudo que eu sei fazer! 😎
+
+🖼️ */create fig*
+Cria uma figurinha a partir de uma imagem, vídeo ou GIF que você mandar.
+1️⃣ Digite /create fig
+2️⃣ Mande a foto, vídeo ou GIF (com legenda opcional, vira o nome da figurinha)
+
+🎨 */fig <descrição>*
+Cria uma figurinha do zero, com IA, a partir do que você descrever.
+Ex: /fig gato astronauta
+
+🔄 */convert*
+Converte uma figurinha de volta pra foto ou vídeo.
+1️⃣ Digite /convert
+2️⃣ Mande a figurinha
+🖼️ Normal vira imagem, 🎞️ animada vira vídeo
+
+🎵 */audio*
+Extrai o áudio de um vídeo (tipo tirar a música dele).
+1️⃣ Digite /audio
+2️⃣ Mande o vídeo
+
+💬 */Bot* (só em grupos)
+Me chama pra bater papo com vocês! Eu entro na conversa com gírias e piadas,
+e fico "desligado" de novo depois de um tempo sem ninguém falar.
+
+📝 */feedback <mensagem>*
+Manda uma sugestão, elogio ou reclamação direto pra quem cuida de mim.
+Ex: /feedback esse bot é muito bom!
+
+👥 QUER O CHAIM-BOT NO SEU GRUPO?
+Entre em contato pelo número:
+📞 +55 65 99679-9870
+
+💙 CHAIM-BOT — seu bot de figurinhas, conversões e conversa! 🤖✨`;
 
 const MENSAGEM_GRUPO_PENDENTE = `⚠️🤖 AVISO — CHAIM-BOT
 
@@ -120,6 +160,7 @@ Vou sair agora. Até mais! 👋`;
 module.exports = {
   MENSAGEM_BOAS_VINDAS_PV,
   MENSAGEM_NOVA_FUNCAO_CONVERT,
+  MENSAGEM_MENU,
   MENSAGEM_GRUPO_ATIVADO,
   MENSAGEM_GRUPO_PENDENTE,
   MENSAGEM_GRUPO_RECUSADO,
