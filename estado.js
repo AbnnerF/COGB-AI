@@ -71,6 +71,10 @@ function ehDono(id) {
   return carregarEstado().donoId === id;
 }
 
+function obterDono() {
+  return carregarEstado().donoId;
+}
+
 // --- Autorização de grupos ---
 
 // Grupos que o bot já conhecia antes desse recurso existir ficam liberados por padrão;
@@ -122,6 +126,7 @@ module.exports = {
   marcarAvisoConvert,
   definirDono,
   ehDono,
+  obterDono,
   statusDoGrupo,
   temStatusRegistrado,
   definirStatusGrupo,
