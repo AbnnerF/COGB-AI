@@ -121,7 +121,7 @@ Converte uma figurinha de volta pra foto ou vídeo.
 🎵 */audio*
 Extrai o áudio de um vídeo (tipo tirar a música dele).
 1️⃣ Digite /audio
-2️⃣ Mande o vídeo
+2️⃣ Mande o vídeo, ou cole um link do YouTube (funciona os dois!)
 
 💬 */Bot* (só em grupos)
 Me chama pra bater papo com vocês! Eu entro na conversa com gírias e piadas,
