@@ -15,6 +15,7 @@ const {
   converterFigurinhaParaImagem,
   converterFigurinhaParaVideo,
   converterVideoParaAudio,
+  baixarAudioDoYoutube,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
@@ -52,8 +53,11 @@ const aguardandoEscolhaFormato = {}; // chave -> { bufferImagem, legenda, timeou
 // Guarda quem pediu "/convert" e tá esperando mandar a figurinha
 const aguardandoConversao = {}; // chave -> timeoutHandle
 
-// Guarda quem pediu "/audio" e tá esperando mandar o vídeo
+// Guarda quem pediu "/audio" e tá esperando mandar o vídeo (ou um link do YouTube)
 const aguardandoAudio = {}; // chave -> timeoutHandle
+
+// Reconhece links do YouTube (youtube.com/watch?v=... ou youtu.be/...)
+const REGEX_YOUTUBE = /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+\S*)/i;
 
 // Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
 const contatosCache = {};
@@ -402,6 +406,33 @@ async function iniciarBot() {
 
     if (!texto) return;
 
+    // Se a pessoa já tinha pedido "/audio" e agora mandou um link do YouTube (em vez de vídeo)
+    if (aguardandoAudio[chaveEspera]) {
+      const linkYoutube = texto.match(REGEX_YOUTUBE);
+      if (linkYoutube) {
+        clearTimeout(aguardandoAudio[chaveEspera]);
+        delete aguardandoAudio[chaveEspera];
+
+        try {
+          await sock.sendPresenceUpdate('composing', chatId);
+        } catch (err) {
+          // sem problema se não conseguir mostrar "digitando"
+        }
+
+        const audio = await baixarAudioDoYoutube(linkYoutube[1]);
+
+        if (!audio) {
+          await enviarMsg(sock, chatId, {
+            text: 'Deu ruim pra baixar esse vídeo do YouTube 😕 confere o link e tenta de novo',
+          });
+          return;
+        }
+
+        await enviarMsg(sock, chatId, { audio, mimetype: 'audio/mpeg' });
+        return;
+      }
+    }
+
     // Comando secreto: reconhece quem manda como o criador/dono do bot
     if (!isGroup && texto.trim() === '/1480018122') {
       estado.definirDono(remetenteId);
@@ -510,4 +541,191 @@ async function iniciarBot() {
 
       const pendente = aguardandoEscolhaFormato[chaveEspera];
       clearTimeout(pendente.timeoutHandle);
-      delete aguardandoEscolhaForma
+      delete aguardandoEscolhaFormato[chaveEspera];
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema se não conseguir mostrar "digitando"
+      }
+
+      const figurinha = pendente.animada
+        ? await criarFigurinhaAnimada(pendente.bufferImagem, pendente.legenda, modo)
+        : await criarFigurinhaDeImagem(pendente.bufferImagem, pendente.legenda, modo);
+
+      if (!figurinha) {
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra criar a figurinha 😕 tenta de novo' });
+        return;
+      }
+
+      await enviarMsg(sock, chatId, { sticker: figurinha });
+      return;
+    }
+
+    // Comando /menu - mostra o tutorial com todas as funções (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase() === '/menu') {
+      await enviarMsg(sock, chatId, { text: MENSAGEM_MENU });
+      return;
+    }
+
+    // Comando /feedback <mensagem> - encaminha pro dono do bot
+    if (texto.trim().toLowerCase().startsWith('/feedback ')) {
+      const mensagemFeedback = texto.trim().slice(10).trim();
+
+      if (!mensagemFeedback) {
+        await enviarMsg(sock, chatId, { text: 'Escreve o feedback depois do comando! Ex: /feedback esse bot é muito bom!' });
+        return;
+      }
+
+      const donoId = estado.obterDono();
+      if (donoId) {
+        let origem = nomeRemetente;
+        if (isGroup) {
+          try {
+            const metadata = await sock.groupMetadata(chatId);
+            origem = `${nomeRemetente} (grupo: ${metadata.subject || chatId})`;
+          } catch (err) {
+            origem = `${nomeRemetente} (grupo)`;
+          }
+        }
+
+        try {
+          await enviarMsg(sock, `${donoId}@s.whatsapp.net`, {
+            text: `📝 *Novo feedback recebido!*\n\n👤 De: ${origem}\n\n"${mensagemFeedback}"`,
+          });
+        } catch (err) {
+          console.log('Erro ao encaminhar feedback:', err.message);
+        }
+      } else {
+        console.log('Feedback recebido, mas ainda não tem dono definido:', mensagemFeedback);
+      }
+
+      await enviarMsg(sock, chatId, { text: '✅ Feedback enviado, valeu! 💙' });
+      return;
+    }
+
+    // Comando /audio - pede pra pessoa mandar o vídeo, ou já aceita um link do YouTube direto
+    if (texto.trim().toLowerCase().startsWith('/audio')) {
+      const linkJunto = texto.match(REGEX_YOUTUBE);
+
+      if (linkJunto) {
+        try {
+          await sock.sendPresenceUpdate('composing', chatId);
+        } catch (err) {
+          // sem problema se não conseguir mostrar "digitando"
+        }
+
+        const audio = await baixarAudioDoYoutube(linkJunto[1]);
+
+        if (!audio) {
+          await enviarMsg(sock, chatId, {
+            text: 'Deu ruim pra baixar esse vídeo do YouTube 😕 confere o link e tenta de novo',
+          });
+          return;
+        }
+
+        await enviarMsg(sock, chatId, { audio, mimetype: 'audio/mpeg' });
+        return;
+      }
+
+      aguardandoAudio[chaveEspera] = setTimeout(() => {
+        delete aguardandoAudio[chaveEspera];
+      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar nada
+
+      await enviarMsg(sock, chatId, {
+        text: 'Manda o vídeo que você quer transformar em áudio, ou cola um link do YouTube! 🎬🎵',
+      });
+      return;
+    }
+
+    // Comando /convert - pede pra pessoa mandar a figurinha (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase() === '/convert') {
+      aguardandoConversao[chaveEspera] = setTimeout(() => {
+        delete aguardandoConversao[chaveEspera];
+      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a figurinha
+
+      await enviarMsg(sock, chatId, {
+        text: 'Manda a figurinha que você quer converter! 🔄 Normal vira imagem, animada vira vídeo.',
+      });
+      return;
+    }
+
+    // Comando /Create fig - pede pra pessoa mandar a foto (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase() === '/create fig') {
+      aguardandoFoto[chaveEspera] = setTimeout(() => {
+        delete aguardandoFoto[chaveEspera];
+      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a foto
+
+      await enviarMsg(sock, chatId, {
+        text: `Manda a foto, vídeo ou GIF aí! 📸 Se quiser, coloca uma legenda — isso vira o nome da figurinha. (vídeos com mais de ${DURACAO_MAXIMA_FIGURINHA}s são cortados automaticamente)`,
+      });
+      return;
+    }
+
+    // Comando /fig <descrição> - gera uma figurinha com IA (funciona em grupo ou no privado)
+    if (texto.trim().toLowerCase().startsWith('/fig ')) {
+      const descricao = texto.trim().slice(5).trim();
+      if (!descricao) {
+        await enviarMsg(sock, chatId, { text: 'Descreve o que você quer na figurinha! Ex: /fig gato astronauta' });
+        return;
+      }
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema se não conseguir mostrar "digitando"
+      }
+
+      const figurinha = await gerarFigurinha(descricao);
+      if (!figurinha) {
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra gerar a figurinha agora 😕 tenta de novo' });
+        return;
+      }
+
+      await enviarMsg(sock, chatId, { sticker: figurinha });
+      return;
+    }
+
+    if (!isGroup) return; // a conversa casual (/Bot) só funciona em grupos
+
+    const comandoAtivar = texto.trim().toLowerCase() === '/bot';
+    const conversaJaAtiva = Boolean(conversasAtivas[chatId]);
+
+    // Se não foi o comando /Bot e a conversa não tá ativa nesse grupo, o bot ignora a mensagem
+    if (!comandoAtivar && !conversaJaAtiva) return;
+
+    // (Re)inicia o cronômetro: se ninguém mais falar nesse tempo, a conversa "desliga" e esquece o histórico
+    if (conversasAtivas[chatId]) clearTimeout(conversasAtivas[chatId]);
+    conversasAtivas[chatId] = setTimeout(() => {
+      delete conversasAtivas[chatId];
+      delete historicoConversas[chatId];
+    }, TEMPO_INATIVIDADE_MS);
+
+    // Quando é só o comando de ativação, começa um histórico novo e manda uma saudação
+    // (esse fluxo já tem seu próprio atraso de "digitando", por isso fica fora do enviarMsg de 3s fixos)
+    if (comandoAtivar) {
+      historicoConversas[chatId] = [];
+      const saudacao = await gerarResposta([
+        { role: 'user', content: `${nomeRemetente} acabou de te chamar pra participar da conversa do grupo, manda um "e aí" descontraído` },
+      ]);
+      if (saudacao) {
+        historicoConversas[chatId].push({ role: 'assistant', content: saudacao });
+        await enviarComAtraso(sock, chatId, saudacao);
+      }
+      return;
+    }
+
+    if (!historicoConversas[chatId]) historicoConversas[chatId] = [];
+    historicoConversas[chatId].push({ role: 'user', content: `${nomeRemetente}: ${limparMencoes(texto)}` });
+
+    const resposta = await gerarResposta(historicoConversas[chatId].slice(-MAX_HISTORICO));
+    if (!resposta) return;
+
+    historicoConversas[chatId].push({ role: 'assistant', content: resposta });
+    historicoConversas[chatId] = historicoConversas[chatId].slice(-MAX_HISTORICO);
+
+    await enviarComAtraso(sock, chatId, resposta);
+  });
+}
+
+iniciarBot();
