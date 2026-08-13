@@ -274,6 +274,31 @@ async function converterVideoParaAudio(bufferVideo) {
   }
 }
 
+/**
+ * Baixa um vídeo do YouTube e já devolve só o áudio (mp3), usando o yt-dlp.
+ * Retorna um Buffer com o áudio, ou null se der algum erro.
+ */
+async function baixarAudioDoYoutube(url) {
+  garantirPastaTemp();
+  const nomeBase = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const caminhoSaida = path.join(PASTA_TEMP, `${nomeBase}.mp3`);
+  const modelo = path.join(PASTA_TEMP, `${nomeBase}.%(ext)s`);
+
+  try {
+    await execAsync(`yt-dlp -x --audio-format mp3 --audio-quality 5 --no-playlist -o "${modelo}" "${url}"`, {
+      timeout: 120000, // 2 minutos no máximo, pra não ficar travado num vídeo gigante
+    });
+
+    if (!fs.existsSync(caminhoSaida)) return null;
+    return fs.readFileSync(caminhoSaida);
+  } catch (err) {
+    console.log('Erro ao baixar áudio do YouTube:', err.message);
+    return null;
+  } finally {
+    if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
+  }
+}
+
 module.exports = {
   gerarFigurinha,
   criarFigurinhaDeImagem,
@@ -281,6 +306,7 @@ module.exports = {
   converterFigurinhaParaImagem,
   converterFigurinhaParaVideo,
   converterVideoParaAudio,
+  baixarAudioDoYoutube,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
