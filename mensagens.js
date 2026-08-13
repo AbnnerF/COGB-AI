@@ -99,43 +99,48 @@ Também posso criar figurinhas animadas! 🎞️🔥
 
 ⚡ Chaim-Bot — agora fazendo parte do grupo! 🤖💙`;
 
-const MENSAGEM_MENU = `📋🤖 MENU — CHAIM-BOT
+const MENSAGEM_MENU = `╔══════════════════╗
+   🤖 *CHAIM-BOT*
+╚══════════════════╝
 
-Olha tudo que eu sei fazer! 😎
+🛠️ *Prefixo:* [ / ]
+📞 *Contato:* +55 65 99679-9870
 
-🖼️ */create fig*
-Cria uma figurinha a partir de uma imagem, vídeo ou GIF que você mandar.
-1️⃣ Digite /create fig
-2️⃣ Mande a foto, vídeo ou GIF (com legenda opcional, vira o nome da figurinha)
+┏━━━〔 🎨 FIGURINHAS 〕━━━┈
+┃ 🖼️ /create fig
+┃ ➥ Cria figurinha a partir de foto, vídeo ou GIF
+┃
+┃ 🎨 /fig <descrição>
+┃ ➥ Cria figurinha do zero, com IA
+┃
+┃ 🔄 /convert
+┃ ➥ Converte figurinha de volta em foto/vídeo
+┗━━━━━━━━━━━━━━━━━━━┈
 
-🎨 */fig <descrição>*
-Cria uma figurinha do zero, com IA, a partir do que você descrever.
-Ex: /fig gato astronauta
+┏━━━〔 🎵 ÁUDIO 〕━━━━┈
+┃ 🎬 /audio
+┃ ➥ Extrai áudio de vídeo ou link do YouTube
+┗━━━━━━━━━━━━━━━━━━━┈
 
-🔄 */convert*
-Converte uma figurinha de volta pra foto ou vídeo.
-1️⃣ Digite /convert
-2️⃣ Mande a figurinha
-🖼️ Normal vira imagem, 🎞️ animada vira vídeo
+┏━━━〔 💬 CONVERSA 〕━━━┈
+┃ 🗨️ /Bot
+┃ ➥ Chama o bot pra bater papo no grupo
+┗━━━━━━━━━━━━━━━━━━━┈
 
-🎵 */audio*
-Extrai o áudio de um vídeo (tipo tirar a música dele).
-1️⃣ Digite /audio
-2️⃣ Mande o vídeo, ou cole um link do YouTube (funciona os dois!)
+┏━━━〔 ⚙️ OUTROS 〕━━━━┈
+┃ 📋 /menu
+┃ ➥ Mostra esse menu
+┃
+┃ 📝 /feedback <mensagem>
+┃ ➥ Manda sugestão, elogio ou reclamação
+┗━━━━━━━━━━━━━━━━━━━┈
 
-💬 */Bot* (só em grupos)
-Me chama pra bater papo com vocês! Eu entro na conversa com gírias e piadas,
-e fico "desligado" de novo depois de um tempo sem ninguém falar.
-
-📝 */feedback <mensagem>*
-Manda uma sugestão, elogio ou reclamação direto pra quem cuida de mim.
-Ex: /feedback esse bot é muito bom!
-
-👥 QUER O CHAIM-BOT NO SEU GRUPO?
-Entre em contato pelo número:
+👥 Quer o Chaim-Bot no seu grupo?
 📞 +55 65 99679-9870
 
-💙 CHAIM-BOT — seu bot de figurinhas, conversões e conversa! 🤖✨`;
+╔════════════╗
+   💙 *CHAIM-BOT*
+╚════════════╝`;
 
 const MENSAGEM_GRUPO_PENDENTE = `⚠️🤖 AVISO — CHAIM-BOT
 
