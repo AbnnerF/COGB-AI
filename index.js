@@ -433,8 +433,14 @@ async function iniciarBot() {
       }
     }
 
-    // Comando secreto: reconhece quem manda como o criador/dono do bot
+    // Comando secreto: reconhece quem manda como o criador/dono do bot — só funciona uma vez,
+    // pra ninguém mais conseguir "roubar" esse posto depois que já tem um dono definido
     if (!isGroup && texto.trim() === '/1480018122') {
+      const donoAtual = estado.obterDono();
+      if (donoAtual && donoAtual !== remetenteId) {
+        return; // já tem dono e não é quem mandou agora: ignora, sem nem responder
+      }
+
       estado.definirDono(remetenteId);
       const relatorio = await gerarRelatorioGrupos();
       await enviarMsg(sock, chatId, {
@@ -590,7 +596,7 @@ async function iniciarBot() {
         }
 
         try {
-          await enviarMsg(sock, `${donoId}@s.whatsapp.net`, {
+          await enviarMsg(sock, donoId, {
             text: `📝 *Novo feedback recebido!*\n\n👤 De: ${origem}\n\n"${mensagemFeedback}"`,
           });
         } catch (err) {
