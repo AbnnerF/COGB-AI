@@ -568,6 +568,45 @@ async function iniciarBot() {
       return;
     }
 
+    // Comandos "de ação" estilo Discord (/hug, /punch) - só funcionam em grupos
+    const ACOES_DISCORD = {
+      '/hug': { categoria: 'hug', verbo: 'abraçou', emoji: '🤗' },
+      '/punch': { categoria: 'punch', verbo: 'socou', emoji: '👊' },
+    };
+    const primeiraPalavra = texto.trim().split(/\s+/)[0].toLowerCase();
+
+    if (isGroup && ACOES_DISCORD[primeiraPalavra]) {
+      const acao = ACOES_DISCORD[primeiraPalavra];
+      const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      const alvoId = mentionedJid[0];
+
+      if (!alvoId) {
+        await enviarMsg(sock, chatId, { text: `Menciona alguém! Ex: ${primeiraPalavra} @pessoa` });
+        return;
+      }
+
+      try {
+        const respostaApi = await fetch(`https://nekos.best/api/v2/${acao.categoria}`);
+        const dados = await respostaApi.json();
+        const urlGif = dados?.results?.[0]?.url;
+        if (!urlGif) throw new Error('a API não devolveu nenhum gif');
+
+        const respostaGif = await fetch(urlGif);
+        const bufferGif = Buffer.from(await respostaGif.arrayBuffer());
+
+        await enviarMsg(sock, chatId, {
+          video: bufferGif,
+          gifPlayback: true,
+          caption: `@${remetenteId.split('@')[0]} ${acao.verbo} @${alvoId.split('@')[0]}! ${acao.emoji}`,
+          mentions: [remetenteId, alvoId],
+        });
+      } catch (err) {
+        console.log(`Erro ao processar ${primeiraPalavra}:`, err.message);
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra buscar o gif agora 😕 tenta de novo' });
+      }
+      return;
+    }
+
     // Comando /menu - mostra o tutorial com todas as funções (funciona em grupo ou no privado)
     if (texto.trim().toLowerCase() === '/menu') {
       await enviarMsg(sock, chatId, { text: MENSAGEM_MENU });
