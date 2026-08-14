@@ -127,6 +127,14 @@ const MENSAGEM_MENU = `╔══════════════════
 ┃ ➥ Chama o bot pra bater papo no grupo
 ┗━━━━━━━━━━━━━━━━━━━┈
 
+┏━━━〔 🎮 DIVERSÃO 〕━━━┈
+┃ 🤗 /hug @pessoa
+┃ ➥ Manda um abraço
+┃
+┃ 👊 /punch @pessoa
+┃ ➥ Dá um soco (de brincadeira!)
+┗━━━━━━━━━━━━━━━━━━━┈
+
 ┏━━━〔 ⚙️ OUTROS 〕━━━━┈
 ┃ 📋 /menu
 ┃ ➥ Mostra esse menu
