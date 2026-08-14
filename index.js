@@ -15,6 +15,7 @@ const {
   converterFigurinhaParaImagem,
   converterFigurinhaParaVideo,
   converterVideoParaAudio,
+  converterGifParaVideo,
   baixarAudioDoYoutube,
   obterDimensoes,
   obterDuracao,
@@ -586,12 +587,17 @@ async function iniciarBot() {
       }
 
       try {
-        const respostaApi = await fetch(`https://nekos.best/api/v2/${acao.categoria}`, {
-          headers: {
-            'User-Agent': 'ChaimBot/1.0 (https://github.com/AbnnerF/COGB-AI)',
-            Accept: 'application/json',
-          },
-        });
+        let respostaApi;
+        try {
+          respostaApi = await fetch(`https://nekos.best/api/v2/${acao.categoria}`, {
+            headers: {
+              'User-Agent': 'ChaimBot/1.0 (https://github.com/AbnnerF/COGB-AI)',
+              Accept: 'application/json',
+            },
+          });
+        } catch (erroRede) {
+          throw new Error(`falha ao contatar a API de gifs: ${erroRede.message}`);
+        }
 
         const textoResposta = await respostaApi.text();
         let dados;
@@ -605,11 +611,19 @@ async function iniciarBot() {
         const urlGif = dados?.results?.[0]?.url;
         if (!urlGif) throw new Error('a API não devolveu nenhum gif');
 
-        const respostaGif = await fetch(urlGif);
-        const bufferGif = Buffer.from(await respostaGif.arrayBuffer());
+        let bufferGif;
+        try {
+          const respostaGif = await fetch(urlGif);
+          bufferGif = Buffer.from(await respostaGif.arrayBuffer());
+        } catch (erroRede) {
+          throw new Error(`falha ao baixar o gif: ${erroRede.message}`);
+        }
+
+        const bufferVideo = await converterGifParaVideo(bufferGif);
+        if (!bufferVideo) throw new Error('não consegui converter o gif pra vídeo');
 
         await enviarMsg(sock, chatId, {
-          video: bufferGif,
+          video: bufferVideo,
           gifPlayback: true,
           caption: `@${remetenteId.split('@')[0]} ${acao.verbo} @${alvoId.split('@')[0]}! ${acao.emoji}`,
           mentions: [remetenteId, alvoId],
