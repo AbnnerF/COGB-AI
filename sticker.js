@@ -299,6 +299,32 @@ async function baixarAudioDoYoutube(url) {
   }
 }
 
+/**
+ * Converte um GIF (bytes crus) num vídeo mp4, formato que o WhatsApp entende
+ * pra reproduzir como "gif" de verdade (o WhatsApp não aceita o .gif bruto como vídeo).
+ * Retorna um Buffer com o vídeo, ou null se der algum erro.
+ */
+async function converterGifParaVideo(bufferGif) {
+  garantirPastaTemp();
+  const nomeArquivo = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const caminhoEntrada = path.join(PASTA_TEMP, `${nomeArquivo}.gif`);
+  const caminhoSaida = path.join(PASTA_TEMP, `${nomeArquivo}.mp4`);
+
+  try {
+    fs.writeFileSync(caminhoEntrada, bufferGif);
+    await execAsync(
+      `ffmpeg -y -i "${caminhoEntrada}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${caminhoSaida}"`
+    );
+    return fs.readFileSync(caminhoSaida);
+  } catch (err) {
+    console.log('Erro ao converter gif em vídeo:', err.message);
+    return null;
+  } finally {
+    if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
+    if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
+  }
+}
+
 module.exports = {
   gerarFigurinha,
   criarFigurinhaDeImagem,
@@ -306,9 +332,11 @@ module.exports = {
   converterFigurinhaParaImagem,
   converterFigurinhaParaVideo,
   converterVideoParaAudio,
+  converterGifParaVideo,
   baixarAudioDoYoutube,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
   DURACAO_MAXIMA_FIGURINHA,
 };
+
