@@ -586,8 +586,22 @@ async function iniciarBot() {
       }
 
       try {
-        const respostaApi = await fetch(`https://nekos.best/api/v2/${acao.categoria}`);
-        const dados = await respostaApi.json();
+        const respostaApi = await fetch(`https://nekos.best/api/v2/${acao.categoria}`, {
+          headers: {
+            'User-Agent': 'ChaimBot/1.0 (https://github.com/AbnnerF/COGB-AI)',
+            Accept: 'application/json',
+          },
+        });
+
+        const textoResposta = await respostaApi.text();
+        let dados;
+        try {
+          dados = JSON.parse(textoResposta);
+        } catch (erroParse) {
+          console.log('Resposta da nekos.best não era JSON:', textoResposta.slice(0, 300));
+          throw new Error('resposta inesperada da API de gifs');
+        }
+
         const urlGif = dados?.results?.[0]?.url;
         if (!urlGif) throw new Error('a API não devolveu nenhum gif');
 
