@@ -614,7 +614,10 @@ async function iniciarBot() {
         let bufferGif;
         try {
           const respostaGif = await fetch(urlGif);
+          if (!respostaGif.ok) throw new Error(`status HTTP ${respostaGif.status}`);
           bufferGif = Buffer.from(await respostaGif.arrayBuffer());
+          console.log(`Gif baixado: ${bufferGif.length} bytes (${urlGif})`);
+          if (bufferGif.length < 1000) throw new Error(`gif baixado ficou pequeno demais (${bufferGif.length} bytes)`);
         } catch (erroRede) {
           throw new Error(`falha ao baixar o gif: ${erroRede.message}`);
         }
