@@ -613,7 +613,12 @@ async function iniciarBot() {
 
         let bufferGif;
         try {
-          const respostaGif = await fetch(urlGif);
+          const respostaGif = await fetch(urlGif, {
+            headers: {
+              'User-Agent': 'ChaimBot/1.0 (https://github.com/AbnnerF/COGB-AI)',
+              Referer: 'https://nekos.best/',
+            },
+          });
           if (!respostaGif.ok) throw new Error(`status HTTP ${respostaGif.status}`);
           bufferGif = Buffer.from(await respostaGif.arrayBuffer());
           console.log(`Gif baixado: ${bufferGif.length} bytes (${urlGif})`);
