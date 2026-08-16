@@ -7,7 +7,7 @@ const {
   downloadMediaMessage,
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
-const { gerarResposta } = require('./chatbot');
+const { gerarResposta, gerarRespostaComPrompt } = require('./chatbot');
 const {
   gerarFigurinha,
   criarFigurinhaDeImagem,
@@ -17,6 +17,7 @@ const {
   converterVideoParaAudio,
   converterGifParaVideo,
   baixarAudioDoYoutube,
+  gerarImagem,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
@@ -566,6 +567,170 @@ async function iniciarBot() {
       }
 
       await enviarMsg(sock, chatId, { sticker: figurinha });
+      return;
+    }
+
+    // Comando /ia e /ask <pergunta> - conversa direta com a IA, sem manter histórico
+    if (texto.trim().toLowerCase().startsWith('/ia ') || texto.trim().toLowerCase().startsWith('/ask ')) {
+      const pergunta = texto.trim().slice(texto.indexOf(' ') + 1).trim();
+      if (!pergunta) {
+        await enviarMsg(sock, chatId, { text: 'Faz uma pergunta depois do comando! Ex: /ia qual a capital do Japão?' });
+        return;
+      }
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema
+      }
+
+      const resposta = await gerarResposta([{ role: 'user', content: pergunta }]);
+      await enviarMsg(sock, chatId, { text: resposta || 'Deu ruim pra responder agora 😕 tenta de novo' });
+      return;
+    }
+
+    // Comando /roast @pessoa - a IA cria uma zoeira leve sobre a pessoa mencionada (só em grupos)
+    if (isGroup && texto.trim().toLowerCase().startsWith('/roast')) {
+      const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      const alvoId = mentionedJid[0];
+
+      if (!alvoId) {
+        await enviarMsg(sock, chatId, { text: 'Menciona alguém! Ex: /roast @pessoa' });
+        return;
+      }
+
+      const nomeAlvo = contatosCache[alvoId] || alvoId.split('@')[0];
+      const resposta = await gerarRespostaComPrompt(
+        'Você cria zoeiras curtas, leves e engraçadas sobre pessoas, em português brasileiro, no estilo de ' +
+          'brincadeira entre amigos. NUNCA seja realmente ofensivo, preconceituoso, ou cruel — mantenha tudo ' +
+          'no nível de brincadeira inofensiva. Responda só com a zoeira em 1 ou 2 frases, nada mais.',
+        `Cria uma zoeira sobre uma pessoa chamada ${nomeAlvo}`
+      );
+
+      await enviarMsg(sock, chatId, {
+        text: resposta ? `${resposta}` : 'Deu ruim pra pensar numa zoeira agora 😕',
+        mentions: [alvoId],
+      });
+      return;
+    }
+
+    // Comando /story <tema> - a IA cria uma historinha curta
+    if (texto.trim().toLowerCase().startsWith('/story ')) {
+      const tema = texto.trim().slice(7).trim();
+      if (!tema) {
+        await enviarMsg(sock, chatId, { text: 'Me dá um tema! Ex: /story um gato astronauta' });
+        return;
+      }
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema
+      }
+
+      const resposta = await gerarRespostaComPrompt(
+        'Você escreve historinhas curtas, criativas e envolventes em português brasileiro, com no máximo ' +
+          '6 a 8 frases. Responda só com a história, sem introduções nem comentários.',
+        `Cria uma historinha curta sobre: ${tema}`
+      );
+
+      await enviarMsg(sock, chatId, { text: resposta || 'Deu ruim pra criar a história agora 😕 tenta de novo' });
+      return;
+    }
+
+    // Comando /translate <texto> - traduz (PT -> EN, ou qualquer outro idioma -> PT)
+    if (texto.trim().toLowerCase().startsWith('/translate ')) {
+      const textoTraduzir = texto.trim().slice(11).trim();
+      if (!textoTraduzir) {
+        await enviarMsg(sock, chatId, { text: 'Manda o texto pra traduzir! Ex: /translate bom dia' });
+        return;
+      }
+
+      const resposta = await gerarRespostaComPrompt(
+        'Você é um tradutor. Se o texto do usuário estiver em português, traduza pro inglês. Se estiver em ' +
+          'qualquer outro idioma, traduza pro português. Responda SOMENTE com a tradução, sem explicações, ' +
+          'sem aspas, sem comentários.',
+        textoTraduzir
+      );
+
+      await enviarMsg(sock, chatId, { text: resposta || 'Deu ruim pra traduzir agora 😕 tenta de novo' });
+      return;
+    }
+
+    // Comando /resumo <texto> - resume um texto
+    if (texto.trim().toLowerCase().startsWith('/resumo ')) {
+      const textoResumir = texto.trim().slice(8).trim();
+      if (!textoResumir) {
+        await enviarMsg(sock, chatId, { text: 'Manda o texto pra resumir! Ex: /resumo <texto grande aqui>' });
+        return;
+      }
+
+      const resposta = await gerarRespostaComPrompt(
+        'Você resume textos em português brasileiro de forma clara, objetiva e fiel ao conteúdo original, ' +
+          'em no máximo 3 a 4 frases. Responda somente com o resumo, sem introduções.',
+        textoResumir
+      );
+
+      await enviarMsg(sock, chatId, { text: resposta || 'Deu ruim pra resumir agora 😕 tenta de novo' });
+      return;
+    }
+
+    // Comando /imagine <descrição> - gera uma imagem comum (não figurinha) com IA
+    if (texto.trim().toLowerCase().startsWith('/imagine ')) {
+      const descricao = texto.trim().slice(9).trim();
+      if (!descricao) {
+        await enviarMsg(sock, chatId, { text: 'Descreve o que você quer! Ex: /imagine paisagem no espaço' });
+        return;
+      }
+
+      try {
+        await sock.sendPresenceUpdate('composing', chatId);
+      } catch (err) {
+        // sem problema
+      }
+
+      const imagem = await gerarImagem(descricao);
+      if (!imagem) {
+        await enviarMsg(sock, chatId, { text: 'Deu ruim pra gerar a imagem agora 😕 tenta de novo' });
+        return;
+      }
+
+      await enviarMsg(sock, chatId, { image: imagem, caption: descricao });
+      return;
+    }
+
+    // Comando /dado - rola um dado de 1 a 6
+    if (texto.trim().toLowerCase() === '/dado') {
+      const resultado = Math.floor(Math.random() * 6) + 1;
+      await enviarMsg(sock, chatId, { text: `🎲 Deu *${resultado}*!` });
+      return;
+    }
+
+    // Comando /coin - cara ou coroa
+    if (texto.trim().toLowerCase() === '/coin') {
+      const resultado = Math.random() < 0.5 ? 'Cara' : 'Coroa';
+      await enviarMsg(sock, chatId, { text: `🪙 Deu *${resultado}*!` });
+      return;
+    }
+
+    // Comando /rate @pessoa - dá uma nota aleatória e uma fala engraçadinha (só em grupos)
+    if (isGroup && texto.trim().toLowerCase().startsWith('/rate')) {
+      const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      const alvoId = mentionedJid[0];
+
+      if (!alvoId) {
+        await enviarMsg(sock, chatId, { text: 'Menciona alguém! Ex: /rate @pessoa' });
+        return;
+      }
+
+      const nota = Math.floor(Math.random() * 11); // 0 a 10
+      const FALAS = ['🔥 Mandou bem!', '😅 Podia ser melhor...', '👑 Simplesmente perfeito(a)!', '🤔 Meio na média', '💀 Ixi...'];
+      const fala = FALAS[Math.floor(Math.random() * FALAS.length)];
+
+      await enviarMsg(sock, chatId, {
+        text: `⭐ @${alvoId.split('@')[0]} recebeu nota *${nota}/10*! ${fala}`,
+        mentions: [alvoId],
+      });
       return;
     }
 
