@@ -122,6 +122,23 @@ const MENSAGEM_MENU = `╔══════════════════
 ┃ ➥ Extrai áudio de vídeo ou link do YouTube
 ┗━━━━━━━━━━━━━━━━━━━┈
 
+┏━━━〔 🤖 INTELIGÊNCIA ARTIFICIAL 〕━━━┈
+┃ 💬 /ia <pergunta> ou /ask <pergunta>
+┃ ➥ Conversa direto com a IA
+┃
+┃ 📖 /story <tema>
+┃ ➥ Cria uma historinha curta
+┃
+┃ 🌐 /translate <texto>
+┃ ➥ Traduz (PT ↔ outros idiomas)
+┃
+┃ 📝 /resumo <texto>
+┃ ➥ Resume um texto grande
+┃
+┃ 🖼️ /imagine <descrição>
+┃ ➥ Gera uma imagem com IA
+┗━━━━━━━━━━━━━━━━━━━┈
+
 ┏━━━〔 💬 CONVERSA 〕━━━┈
 ┃ 🗨️ /Bot
 ┃ ➥ Chama o bot pra bater papo no grupo
@@ -133,6 +150,18 @@ const MENSAGEM_MENU = `╔══════════════════
 ┃
 ┃ 👊 /punch @pessoa
 ┃ ➥ Dá um soco (de brincadeira!)
+┃
+┃ 🔥 /roast @pessoa
+┃ ➥ IA cria uma zoeira leve
+┃
+┃ ⭐ /rate @pessoa
+┃ ➥ Dá uma nota aleatória
+┃
+┃ 🎲 /dado
+┃ ➥ Rola um dado de 1 a 6
+┃
+┃ 🪙 /coin
+┃ ➥ Cara ou coroa
 ┗━━━━━━━━━━━━━━━━━━━┈
 
 ┏━━━〔 ⚙️ OUTROS 〕━━━━┈
