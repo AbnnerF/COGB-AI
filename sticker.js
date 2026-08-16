@@ -325,6 +325,25 @@ async function converterGifParaVideo(bufferGif) {
   }
 }
 
+/**
+ * Gera uma imagem comum (não figurinha) a partir de uma descrição, usando IA (Pollinations.ai).
+ * Retorna um Buffer com a imagem, ou null se der algum erro.
+ */
+async function gerarImagem(descricao) {
+  try {
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(descricao)}?width=768&height=768&nologo=true`;
+    const resposta = await fetch(url);
+    if (!resposta.ok) {
+      console.log('Erro ao baixar imagem gerada:', resposta.status);
+      return null;
+    }
+    return Buffer.from(await resposta.arrayBuffer());
+  } catch (err) {
+    console.log('Erro ao gerar imagem:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
   gerarFigurinha,
   criarFigurinhaDeImagem,
@@ -334,6 +353,7 @@ module.exports = {
   converterVideoParaAudio,
   converterGifParaVideo,
   baixarAudioDoYoutube,
+  gerarImagem,
   obterDimensoes,
   obterDuracao,
   ehDesproporcional,
