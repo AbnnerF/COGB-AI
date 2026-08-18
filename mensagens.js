@@ -139,11 +139,6 @@ const MENSAGEM_MENU = `╔══════════════════
 ┃ ➥ Gera uma imagem com IA
 ┗━━━━━━━━━━━━━━━━━━━┈
 
-┏━━━〔 💬 CONVERSA 〕━━━┈
-┃ 🗨️ /Bot
-┃ ➥ Chama o bot pra bater papo no grupo
-┗━━━━━━━━━━━━━━━━━━━┈
-
 ┏━━━〔 🎮 DIVERSÃO 〕━━━┈
 ┃ 🤗 /hug @pessoa
 ┃ ➥ Manda um abraço
@@ -162,6 +157,16 @@ const MENSAGEM_MENU = `╔══════════════════
 ┃
 ┃ 🪙 /coin
 ┃ ➥ Cara ou coroa
+┗━━━━━━━━━━━━━━━━━━━┈
+
+┏━━━〔 ⚔️ RPG (se ativado no grupo) 〕━━━┈
+┃ ⚔️ /duelo @pessoa
+┃ ➥ Batalha aleatória por XP e vitórias
+┃
+┃ 👤 /perfil
+┃ ➥ Mostra seu nível, XP, vitórias e derrotas
+┃
+┃ ✨ Usar comandos também dá XP!
 ┗━━━━━━━━━━━━━━━━━━━┈
 
 ┏━━━〔 ⚙️ OUTROS 〕━━━━┈
