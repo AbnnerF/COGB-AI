@@ -2,9 +2,11 @@ const { gerarRespostaComPrompt } = require('./chatbot');
 
 const sessoes = {};
 
-function iniciarQuiz(chatId, criadorId) {
-  sessoes[chatId] = {
+function iniciarQuiz(grupoId, criadorId, nomeGrupo = 'grupo') {
+  sessoes[grupoId] = {
+    grupoId,
     criadorId,
+    nomeGrupo,
     etapa: 'publico',
     publico: null,
     participantes: [],
@@ -14,80 +16,48 @@ function iniciarQuiz(chatId, criadorId) {
     perguntas: [],
     perguntaAtual: 0,
     respostas: {},
-    esperandoConfirmacao: false,
     quizPublicado: false,
   };
 
-  return sessoes[chatId];
+  return sessoes[grupoId];
 }
 
-function obterSessao(chatId) {
-  return sessoes[chatId];
+function obterSessao(grupoId) {
+  return sessoes[grupoId];
 }
 
-function apagarSessao(chatId) {
-  delete sessoes[chatId];
+function obterSessaoDoCriador(criadorId) {
+  return Object.values(sessoes).find(
+    (sessao) => sessao.criadorId === criadorId && !sessao.quizPublicado
+  );
 }
 
-async function gerarPergunta(tema, dificuldade, numero) {
-  const prompt =
-    `Crie a pergunta ${numero} de um quiz em português brasileiro.
-
-Tema: ${tema}
-Dificuldade: ${dificuldade}
-
-Regras:
-- Crie apenas UMA pergunta.
-- Crie exatamente 4 alternativas.
-- Apenas UMA alternativa pode ser correta.
-- Não use pegadinhas injustas.
-- Não coloque a resposta correta sempre na mesma posição.
-- Responda SOMENTE neste formato JSON:
-
-{
-  "pergunta": "texto da pergunta",
-  "alternativas": [
-    "alternativa 1",
-    "alternativa 2",
-    "alternativa 3",
-    "alternativa 4"
-  ],
-  "correta": 1
+function apagarSessao(grupoId) {
+  delete sessoes[grupoId];
 }
 
-O campo "correta" deve ser o número da alternativa correta, de 1 a 4.`;
+function definirParticipantes(grupoId, participantes) {
+  const sessao = sessoes[grupoId];
 
-  try {
-    const resposta = await gerarRespostaComPrompt(
-      'Você é um criador profissional de quizzes. Siga exatamente o formato solicitado.',
-      prompt
-    );
+  if (!sessao) return false;
 
-    const limpo = resposta
-      .replace(/```json/gi, '')
-      .replace(/```/g, '')
-      .trim();
+  sessao.participantes = [...new Set(participantes)];
 
-    const dados = JSON.parse(limpo);
+  return true;
+}
 
-    if (
-      !dados.pergunta ||
-      !Array.isArray(dados.alternativas) ||
-      dados.alternativas.length !== 4 ||
-      ![1, 2, 3, 4].includes(Number(dados.correta))
-    ) {
-      throw new Error('Formato de pergunta inválido');
+function adicionarParticipantes(grupoId, ids) {
+  const sessao = sessoes[grupoId];
+
+  if (!sessao) return false;
+
+  for (const id of ids) {
+    if (!sessao.participantes.includes(id)) {
+      sessao.participantes.push(id);
     }
-
-    return {
-      pergunta: dados.pergunta,
-      alternativas: dados.alternativas,
-      correta: Number(dados.correta),
-    };
-  } catch (erro) {
-    console.log('Erro ao gerar pergunta do quiz:', erro.message);
-    return null;
   }
+
+  return true;
 }
 
 function formatarPergunta(pergunta, numero, total) {
@@ -101,22 +71,77 @@ function formatarPergunta(pergunta, numero, total) {
   );
 }
 
-function adicionarParticipantes(chatId, ids) {
-  const sessao = sessoes[chatId];
+async function gerarPergunta(tema, dificuldade, numero) {
+  const prompt = `Crie a pergunta ${numero} de um quiz em português brasileiro.
 
-  if (!sessao) return false;
+Tema: ${tema}
+Dificuldade: ${dificuldade}
 
-  for (const id of ids) {
-    if (!sessao.participantes.includes(id)) {
-      sessao.participantes.push(id);
-    }
-  }
+Responda SOMENTE com JSON válido, sem markdown:
 
-  return true;
+{
+  "pergunta": "texto da pergunta",
+  "alternativas": [
+    "alternativa 1",
+    "alternativa 2",
+    "alternativa 3",
+    "alternativa 4"
+  ],
+  "correta": 1
 }
 
-function iniciarRespostas(chatId) {
-  const sessao = sessoes[chatId];
+Regras:
+- Exatamente 4 alternativas.
+- Apenas uma alternativa correta.
+- "correta" deve ser 1, 2, 3 ou 4.
+- Não explique nada fora do JSON.`;
+
+  try {
+    const resposta = await gerarRespostaComPrompt(
+      'Você é um criador profissional de quizzes. Gere perguntas claras e justas.',
+      prompt
+    );
+
+    const limpo = String(resposta || '')
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+
+    const inicio = limpo.indexOf('{');
+    const fim = limpo.lastIndexOf('}');
+
+    const dados = JSON.parse(
+      inicio >= 0 && fim >= 0
+        ? limpo.slice(inicio, fim + 1)
+        : limpo
+    );
+
+    if (
+      !dados.pergunta ||
+      !Array.isArray(dados.alternativas) ||
+      dados.alternativas.length !== 4 ||
+      ![1, 2, 3, 4].includes(Number(dados.correta))
+    ) {
+      throw new Error('Formato de pergunta inválido');
+    }
+
+    return {
+      pergunta: String(dados.pergunta),
+      alternativas: dados.alternativas.map(String),
+      correta: Number(dados.correta),
+    };
+  } catch (erro) {
+    console.log(
+      'Erro ao gerar pergunta do quiz:',
+      erro.message
+    );
+
+    return null;
+  }
+}
+
+function iniciarRespostas(grupoId) {
+  const sessao = sessoes[grupoId];
 
   if (!sessao) return false;
 
@@ -131,11 +156,12 @@ function iniciarRespostas(chatId) {
   }
 
   sessao.quizPublicado = true;
+
   return true;
 }
 
-function registrarResposta(chatId, usuarioId, resposta) {
-  const sessao = sessoes[chatId];
+function registrarResposta(grupoId, usuarioId, resposta) {
+  const sessao = sessoes[grupoId];
 
   if (!sessao || !sessao.quizPublicado) {
     return {
@@ -197,8 +223,20 @@ function registrarResposta(chatId, usuarioId, resposta) {
   };
 }
 
-function resultadoJogador(chatId, usuarioId) {
-  const sessao = sessoes[chatId];
+function obterProximaPergunta(grupoId, usuarioId) {
+  const sessao = sessoes[grupoId];
+
+  if (!sessao || !sessao.respostas[usuarioId]) {
+    return null;
+  }
+
+  const indice = sessao.respostas[usuarioId].pergunta;
+
+  return sessao.perguntas[indice] || null;
+}
+
+function resultadoJogador(grupoId, usuarioId) {
+  const sessao = sessoes[grupoId];
 
   if (!sessao || !sessao.respostas[usuarioId]) {
     return null;
@@ -213,14 +251,32 @@ function resultadoJogador(chatId, usuarioId) {
   };
 }
 
+function ranking(grupoId) {
+  const sessao = sessoes[grupoId];
+
+  if (!sessao) return [];
+
+  return Object.entries(sessao.respostas)
+    .map(([id, dados]) => ({
+      id,
+      acertos: dados.acertos,
+      terminou: dados.terminado,
+    }))
+    .sort((a, b) => b.acertos - a.acertos);
+}
+
 module.exports = {
   iniciarQuiz,
   obterSessao,
+  obterSessaoDoCriador,
   apagarSessao,
+  definirParticipantes,
+  adicionarParticipantes,
   gerarPergunta,
   formatarPergunta,
-  adicionarParticipantes,
   iniciarRespostas,
   registrarResposta,
+  obterProximaPergunta,
   resultadoJogador,
+  ranking,
 };
