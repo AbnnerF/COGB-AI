@@ -32,6 +32,7 @@ const {
   MENSAGEM_GRUPO_RECUSADO,
 } = require('./mensagens');
 const estado = require('./estado');
+const quiz = require('./quiz');
 
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // número que autoriza o bot em novos grupos, ex: 5511999999999
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
