@@ -10,7 +10,15 @@ function garantirArquivo() {
     fs.writeFileSync(
       ARQUIVO_ESTADO,
       JSON.stringify(
-        { contatosBoasVindas: [], contatosAvisadosConvert: [], gruposStatus: {}, filaAutorizacao: [], donoId: null },
+        {
+          contatosBoasVindas: [],
+          contatosAvisadosConvert: [],
+          gruposStatus: {},
+          filaAutorizacao: [],
+          donoId: null,
+          rpgGrupos: {},
+          jogadores: {},
+        },
         null,
         2
       )
@@ -23,6 +31,8 @@ function carregarEstado() {
   const dados = JSON.parse(fs.readFileSync(ARQUIVO_ESTADO, 'utf-8'));
   if (!dados.contatosAvisadosConvert) dados.contatosAvisadosConvert = []; // compatibilidade com estado antigo
   if (dados.donoId === undefined) dados.donoId = null; // compatibilidade com estado antigo
+  if (!dados.rpgGrupos) dados.rpgGrupos = {}; // compatibilidade com estado antigo
+  if (!dados.jogadores) dados.jogadores = {}; // compatibilidade com estado antigo
   return dados;
 }
 
@@ -119,6 +129,96 @@ function listarGrupos() {
   return carregarEstado().gruposStatus;
 }
 
+// --- Sistema de RPG (ativado por grupo, via /RPG) ---
+
+function rpgAtivoNoGrupo(chatId) {
+  return Boolean(carregarEstado().rpgGrupos[chatId]);
+}
+
+// Liga/desliga o RPG nesse grupo. Retorna o novo estado (true = ativado).
+function alternarRpgNoGrupo(chatId) {
+  const estado = carregarEstado();
+  const novoValor = !estado.rpgGrupos[chatId];
+  estado.rpgGrupos[chatId] = novoValor;
+  salvarEstado(estado);
+  return novoValor;
+}
+
+// --- Jogadores (XP, nível, vitórias/derrotas) ---
+
+function xpParaNivel(xp) {
+  return Math.floor(xp / 100) + 1;
+}
+
+function obterJogador(id, nomeFallback) {
+  const estado = carregarEstado();
+  const jogador = estado.jogadores[id] || {
+    nome: nomeFallback || id,
+    xp: 0,
+    vitorias: 0,
+    derrotas: 0,
+    comandosUsados: 0,
+  };
+  if (nomeFallback) jogador.nome = nomeFallback;
+  return jogador;
+}
+
+// Soma XP pro jogador (e conta como mais um comando usado). Retorna dados sobre o nível.
+function adicionarXp(id, nomeFallback, quantidade) {
+  const estado = carregarEstado();
+  const jogador = estado.jogadores[id] || {
+    nome: nomeFallback || id,
+    xp: 0,
+    vitorias: 0,
+    derrotas: 0,
+    comandosUsados: 0,
+  };
+
+  const nivelAntigo = xpParaNivel(jogador.xp);
+  jogador.xp += quantidade;
+  jogador.comandosUsados += 1;
+  if (nomeFallback) jogador.nome = nomeFallback;
+  const nivelNovo = xpParaNivel(jogador.xp);
+
+  estado.jogadores[id] = jogador;
+  salvarEstado(estado);
+
+  return { jogador, nivelAntigo, nivelNovo, subiuDeNivel: nivelNovo > nivelAntigo };
+}
+
+// Registra o resultado de um duelo entre dois jogadores
+function registrarDuelo(vencedorId, nomeVencedor, perdedorId, nomePerdedor) {
+  const estado = carregarEstado();
+
+  const vencedor = estado.jogadores[vencedorId] || {
+    nome: nomeVencedor,
+    xp: 0,
+    vitorias: 0,
+    derrotas: 0,
+    comandosUsados: 0,
+  };
+  const perdedor = estado.jogadores[perdedorId] || {
+    nome: nomePerdedor,
+    xp: 0,
+    vitorias: 0,
+    derrotas: 0,
+    comandosUsados: 0,
+  };
+
+  vencedor.nome = nomeVencedor;
+  vencedor.vitorias += 1;
+  vencedor.comandosUsados += 1;
+  vencedor.xp += 30;
+
+  perdedor.nome = nomePerdedor;
+  perdedor.derrotas += 1;
+  perdedor.xp += 10;
+
+  estado.jogadores[vencedorId] = vencedor;
+  estado.jogadores[perdedorId] = perdedor;
+  salvarEstado(estado);
+}
+
 module.exports = {
   jaRecebeuBoasVindas,
   marcarBoasVindas,
@@ -134,4 +234,11 @@ module.exports = {
   proximoDaFila,
   removerDaFila,
   listarGrupos,
+  rpgAtivoNoGrupo,
+  alternarRpgNoGrupo,
+  xpParaNivel,
+  obterJogador,
+  adicionarXp,
+  registrarDuelo,
 };
+
