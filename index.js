@@ -51,6 +51,10 @@ const aguardandoAudio = {}; // chave -> timeoutHandle
 // Reconhece links do YouTube (youtube.com/watch?v=... ou youtu.be/...)
 const REGEX_YOUTUBE = /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+\S*)/i;
 
+// Sistema de QUIZ: cada criador pode ter um quiz ativo por vez.
+// O estado fica em memória enquanto o bot está ligado.
+const quizzesAtivos = {};
+
 // Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
 const contatosCache = {};
 
@@ -65,6 +69,203 @@ function salvarContato(contato) {
 async function enviarMsg(sock, chatId, conteudo) {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   await sock.sendMessage(chatId, conteudo);
+}
+
+// -------------------- SISTEMA DE QUIZ --------------------
+
+function quizChaveCriador(criadorId) {
+  return `quiz:${criadorId}`;
+}
+
+function normalizarAlternativa(valor) {
+  return String(valor || '').trim().toUpperCase().replace(/\s+/g, '');
+}
+
+function obterRespostasQuiz(texto) {
+  const respostas = {};
+  const linhas = String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  for (const linha of linhas) {
+    const match = linha.match(/^R([1-4])\s*[:\-]\s*(.+)$/i);
+    if (match) respostas[`R${match[1]}`] = match[2].trim();
+  }
+
+  return respostas;
+}
+
+function formatarQuizBonito(quiz) {
+  let texto = `╔══════════════════════════╗\n`;
+  texto += `       🎮 *QUIZ DO CHAIM-BOT*       \n`;
+  texto += `╚══════════════════════════╝\n\n`;
+  texto += `📚 *${quiz.perguntas.length}/10 perguntas*\n`;
+  texto += `👑 Criado por: @${quiz.criadorId.split('@')[0]}\n\n`;
+
+  quiz.perguntas.forEach((pergunta, index) => {
+    texto += `┏━━━〔 🧠 ${index + 1}/${quiz.perguntas.length} 〕━━━\n`;
+    texto += `┃ *Pergunta:* ${pergunta.enunciado}\n`;
+    texto += `┃\n`;
+    texto += `┃ R1️⃣ ${pergunta.respostas.R1}\n`;
+    texto += `┃ R2️⃣ ${pergunta.respostas.R2}\n`;
+    texto += `┃ R3️⃣ ${pergunta.respostas.R3}\n`;
+    texto += `┃ R4️⃣ ${pergunta.respostas.R4}\n`;
+    texto += `┗━━━━━━━━━━━━━━━━━━━━\n\n`;
+  });
+
+  texto += `💬 *Como responder:*\n`;
+  texto += `Envie o número da pergunta + R1/R2/R3/R4.\n`;
+  texto += `Exemplo: *1:R2 2:R4 3:R1*\n\n`;
+  texto += `📌 Você pode corrigir sua resposta enquanto o quiz estiver aberto.\n`;
+  texto += `🏁 Quando todos terminarem, o criador deve enviar *confirm*.\n`;
+
+  return texto;
+}
+
+function extrairRespostasParticipante(texto, quantidadePerguntas) {
+  const respostas = {};
+  const normalizado = String(texto || '').toUpperCase();
+  const regex = /(?:Q)?(\d{1,2})\s*[:=\-]?\s*(R[1-4])\b/g;
+  let match;
+
+  while ((match = regex.exec(normalizado))) {
+    const numero = Number(match[1]);
+    if (numero >= 1 && numero <= quantidadePerguntas) respostas[numero] = match[2];
+  }
+
+  return respostas;
+}
+
+function idsUnicos(ids) {
+  return [...new Set((ids || []).filter(Boolean))];
+}
+
+// ------------------ FIM DO SISTEMA DE QUIZ ------------------
+
+async function publicarQuizNoGrupo(sock, quiz) {
+  const chatId = quiz.grupoId;
+
+  if (quiz.modoParticipacao === 'grupo') {
+    try {
+      const metadata = await sock.groupMetadata(chatId);
+      const botId = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : null;
+      quiz.participantes = metadata.participants
+        .map((p) => p.id)
+        .filter((id) => !botId || id !== botId);
+    } catch (err) {
+      console.log('Erro ao obter participantes do grupo para o quiz:', err.message);
+      quiz.participantes = [];
+    }
+  }
+
+  quiz.participantes = idsUnicos(quiz.participantes);
+  quiz.respostasParticipantes = {};
+  quiz.fase = 'emJogo';
+
+  let textoJogo = formatarQuizBonito(quiz);
+  textoJogo += `\n👥 *Participantes: ${quiz.participantes.length}*`;
+  textoJogo += `\n\n⏳ *O quiz está valendo! Boa sorte!*`;
+
+  try {
+    await enviarMsg(sock, chatId, {
+      text: textoJogo,
+      mentions: quiz.participantes,
+    });
+
+    setTimeout(async () => {
+      if (quiz.fase !== 'emJogo') return;
+      try {
+        await enviarMsg(sock, chatId, {
+          text:
+            `⏱️ *QUIZ PUBLICADO!*\n\n` +
+            `Respondam todas as perguntas e, quando terminarem, o criador ` +
+            `@${quiz.criadorId.split('@')[0]} deve enviar *confirm* aqui no grupo.\n\n` +
+            `🏁 Depois do confirm eu vou mostrar quem acertou cada questão e qual era a resposta correta.`,
+          mentions: [quiz.criadorId],
+        });
+      } catch (err) {
+        console.log('Erro ao pedir confirmação do quiz:', err.message);
+      }
+    }, 5000);
+
+    await enviarMsg(sock, quiz.criadorId, {
+      text: '🚀 *Quiz publicado no grupo!*\n\nAgora aguarde o pessoal responder. Quando todos terminarem, escreva *confirm* no grupo para revelar os resultados.'
+    });
+  } catch (err) {
+    console.log('Erro ao publicar quiz:', err.message);
+    quiz.fase = 'confirmarPublicacao';
+    await enviarMsg(sock, quiz.criadorId, {
+      text: '❌ Não consegui publicar o quiz no grupo. Tente *CONFIRMAR* novamente.'
+    });
+  }
+}
+
+async function revelarResultadoQuiz(sock, quiz) {
+  if (quiz.fase !== 'emJogo') return;
+
+  quiz.fase = 'finalizando';
+  const linhas = [
+    `╔══════════════════════════╗`,
+    `      🏆 *RESULTADO DO QUIZ*`,
+    `╚══════════════════════════╝`,
+    ``,
+    `🎮 *${quiz.perguntas.length}/10 perguntas*`,
+    ``
+  ];
+  const mentions = [];
+
+  quiz.perguntas.forEach((pergunta, index) => {
+    const numero = index + 1;
+    const acertaram = [];
+    const erraram = [];
+
+    for (const participanteId of quiz.participantes) {
+      const respostaDada = quiz.respostasParticipantes[participanteId]?.[numero];
+      if (respostaDada === pergunta.correta) {
+        acertaram.push(participanteId);
+      } else {
+        erraram.push(participanteId);
+      }
+    }
+
+    const nomesAcertaram = acertaram.length
+      ? acertaram.map((id) => `@${id.split('@')[0]}`).join(', ')
+      : 'Ninguém 😢';
+    const nomesErraram = erraram.length
+      ? erraram.map((id) => `@${id.split('@')[0]}`).join(', ')
+      : 'Ninguém 🎉';
+
+    linhas.push(`┏━━━〔 🧠 ${numero}/${quiz.perguntas.length} 〕━━━`);
+    linhas.push(`❓ ${pergunta.enunciado}`);
+    linhas.push(``);
+    linhas.push(`✅ *Resposta correta:* ${pergunta.correta} — ${pergunta.respostas[pergunta.correta]}`);
+    linhas.push(``);
+    linhas.push(`🏆 *Acertaram:* ${nomesAcertaram}`);
+    linhas.push(`❌ *Erraram ou não responderam:* ${nomesErraram}`);
+    linhas.push(`┗━━━━━━━━━━━━━━━━━━━━`);
+    linhas.push(``);
+
+    mentions.push(...acertaram, ...erraram);
+  });
+
+  linhas.push(`🎉 *Fim do quiz!*`);
+  linhas.push(`👑 Criado por: @${quiz.criadorId.split('@')[0]}`);
+  mentions.push(quiz.criadorId);
+
+  try {
+    await enviarMsg(sock, quiz.grupoId, {
+      text: linhas.join('\n'),
+      mentions: idsUnicos(mentions),
+    });
+  } catch (err) {
+    console.log('Erro ao revelar resultado do quiz:', err.message);
+  }
+
+  delete quizzesAtivos[quizChaveCriador(quiz.criadorId)];
+
+  try {
+    await enviarMsg(sock, quiz.criadorId, {
+      text: '🏁 *Resultado revelado!* O quiz foi encerrado.'
+    });
+  } catch (err) {}
 }
 
 // Espera um tempo (parecendo "digitando...") antes de mandar a mensagem do chat casual (/Bot)
@@ -397,6 +598,294 @@ async function iniciarBot() {
       '';
 
     if (!texto) return;
+
+    const textoLimpo = texto.trim();
+    const textoLower = textoLimpo.toLowerCase();
+
+    // ==================== SISTEMA DE QUIZ ====================
+    const quizAtual = quizzesAtivos[quizChaveCriador(remetenteId)];
+
+    if (isGroup && textoLower === '/quiz') {
+      if (quizAtual) {
+        await enviarMsg(sock, chatId, {
+          text: '⚠️ Você já tem um quiz em andamento. Termine ou cancele o atual antes de criar outro.'
+        });
+        return;
+      }
+
+      let nomeGrupo = 'seu grupo';
+      try {
+        const metadata = await sock.groupMetadata(chatId);
+        nomeGrupo = metadata.subject || nomeGrupo;
+      } catch (err) {}
+
+      quizzesAtivos[quizChaveCriador(remetenteId)] = {
+        criadorId: remetenteId,
+        nomeCriador: nomeRemetente,
+        grupoId: chatId,
+        fase: 'pergunta',
+        numeroPergunta: 1,
+        perguntas: [],
+        participantes: [],
+        respostasParticipantes: {},
+        modoParticipacao: null,
+      };
+
+      await enviarMsg(sock, remetenteId, {
+        text:
+          `╔══════════════════════════╗\n` +
+          `       🎮 *CRIADOR DE QUIZ*       \n` +
+          `╚══════════════════════════╝\n\n` +
+          `📍 Grupo: *${nomeGrupo}*\n\n` +
+          `🧠 *Pergunta 1/10*\n\n` +
+          `Envie neste formato:\n\n` +
+          `*Pergunta:* Qual é a resposta correta?\n` +
+          `R1: Resposta 1\n` +
+          `R2: Resposta 2\n` +
+          `R3: Resposta 3\n` +
+          `R4: Resposta 4\n\n` +
+          `Depois eu vou perguntar qual é a resposta certa. Você responderá *R1*, *R2*, *R3* ou *R4*.\n\n` +
+          `📌 Mínimo: *3/10*\n` +
+          `📌 Máximo: *10/10*\n` +
+          `📌 Depois de 3 perguntas, use */fimquiz* para terminar.`
+      });
+      return;
+    }
+
+    // Configuração do quiz no PV.
+    if (!isGroup && quizAtual) {
+      const quiz = quizAtual;
+
+      if (quiz.fase === 'pergunta') {
+        if (textoLower === '/cancelquiz') {
+          delete quizzesAtivos[quizChaveCriador(remetenteId)];
+          await enviarMsg(sock, chatId, { text: '🛑 Quiz cancelado.' });
+          return;
+        }
+
+        if (textoLower === '/fimquiz') {
+          if (quiz.perguntas.length < 3) {
+            await enviarMsg(sock, chatId, `⚠️ Você tem ${quiz.perguntas.length}/10. O mínimo para terminar é *3/10*.`);
+            return;
+          }
+
+          quiz.fase = 'participacao';
+          await enviarMsg(sock, chatId, {
+            text:
+              `✅ *Quiz finalizado com ${quiz.perguntas.length}/10!*\n\n` +
+              `Escolha quem poderá participar:\n\n` +
+              `👥 *1* — Grupo todo\n` +
+              `🎯 *2* — Pessoas específicas\n\n` +
+              `Responda apenas *1* ou *2*.\n\n` +
+              `💡 Se escolher 2, use */party* no grupo para mencionar até 9 pessoas.`
+          });
+          return;
+        }
+
+        if (quiz.perguntas.length >= 10) {
+          quiz.fase = 'participacao';
+          await enviarMsg(sock, chatId, {
+            text: '🏆 Você chegou a *10/10*! Agora responda *1* para grupo todo ou *2* para pessoas específicas.'
+          });
+          return;
+        }
+
+        const respostas = obterRespostasQuiz(texto);
+        if (!respostas.R1 || !respostas.R2 || !respostas.R3 || !respostas.R4) {
+          await enviarMsg(sock, chatId, {
+            text:
+              `❌ Preciso das 4 respostas.\n\n` +
+              `Use:\nR1: resposta\nR2: resposta\nR3: resposta\nR4: resposta`
+          });
+          return;
+        }
+
+        const linhas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const perguntaLinha = linhas.find((l) => /^pergunta\s*:/i.test(l));
+        const enunciado = perguntaLinha
+          ? perguntaLinha.replace(/^pergunta\s*:/i, '').trim()
+          : (linhas.find((l) => !/^R[1-4]\s*[:\-]/i.test(l)) || `Questão ${quiz.numeroPergunta}`);
+
+        quiz.respostasPendentes = respostas;
+        quiz.enunciadoPendente = enunciado;
+        quiz.fase = 'correta';
+
+        await enviarMsg(sock, chatId, {
+          text:
+            `🧠 *Qual é a resposta correta da ${quiz.numeroPergunta}/10?*\n\n` +
+            `R1️⃣ ${respostas.R1}\n` +
+            `R2️⃣ ${respostas.R2}\n` +
+            `R3️⃣ ${respostas.R3}\n` +
+            `R4️⃣ ${respostas.R4}\n\n` +
+            `👉 Responda apenas com *R1*, *R2*, *R3* ou *R4*.`
+        });
+        return;
+      }
+
+      if (quiz.fase === 'correta') {
+        const correta = normalizarAlternativa(textoLimpo);
+
+        if (!['R1', 'R2', 'R3', 'R4'].includes(correta)) {
+          await enviarMsg(sock, chatId, {
+            text: '❌ Resposta inválida. Digite *R1*, *R2*, *R3* ou *R4*.'
+          });
+          return;
+        }
+
+        quiz.perguntas.push({
+          enunciado: quiz.enunciadoPendente,
+          respostas: quiz.respostasPendentes,
+          correta,
+        });
+
+        quiz.respostasPendentes = null;
+        quiz.enunciadoPendente = null;
+
+        if (quiz.perguntas.length >= 10) {
+          quiz.fase = 'participacao';
+          await enviarMsg(sock, chatId, {
+            text: '🏆 *10/10 concluído!*\n\nDigite *1* para grupo todo ou *2* para pessoas específicas.'
+          });
+          return;
+        }
+
+        quiz.numeroPergunta += 1;
+        quiz.fase = 'pergunta';
+
+        await enviarMsg(sock, chatId, {
+          text:
+            `✅ Resposta correta salva como *${correta}*!\n\n` +
+            `🧠 *Pergunta ${quiz.numeroPergunta}/10*\n\n` +
+            `Envie:\n*Pergunta:* ...\nR1: ...\nR2: ...\nR3: ...\nR4: ...\n\n` +
+            `Quando tiver pelo menos 3 perguntas, use */fimquiz*.`
+        });
+        return;
+      }
+
+      if (quiz.fase === 'participacao') {
+        if (textoLimpo === '1') {
+          quiz.modoParticipacao = 'grupo';
+          quiz.participantes = null;
+          quiz.fase = 'confirmarPublicacao';
+
+          await enviarMsg(sock, chatId, {
+            text:
+              `👥 *GRUPO TODO selecionado!*\n\n` +
+              `Todos os membros do grupo poderão responder.\n\n` +
+              `✅ Digite *CONFIRMAR* para publicar.\n` +
+              `❌ Digite *CANCELAR* para voltar.`
+          });
+          return;
+        }
+
+        if (textoLimpo === '2') {
+          quiz.modoParticipacao = 'party';
+          quiz.fase = 'aguardandoParty';
+
+          await enviarMsg(sock, chatId, {
+            text:
+              `🎯 *PESSOAS ESPECÍFICAS selecionadas!*\n\n` +
+              `Agora vá ao grupo e envie:\n\n` +
+              `*/party @pessoa1 @pessoa2 ...*\n\n` +
+              `👥 Máximo: *9 pessoas mencionadas*.\n` +
+              `👑 Você participará automaticamente.`
+          });
+          return;
+        }
+
+        await enviarMsg(sock, chatId, '❌ Escolha *1* ou *2*.');
+        return;
+      }
+
+      if (quiz.fase === 'confirmarPublicacao') {
+        if (textoLower === 'cancelar') {
+          quiz.fase = 'participacao';
+          await enviarMsg(sock, chatId, { text: '↩️ Voltamos. Digite *1* para grupo todo ou *2* para pessoas específicas.' });
+          return;
+        }
+
+        if (textoLower === 'confirmar') {
+          await publicarQuizNoGrupo(sock, quiz);
+          return;
+        }
+
+        await enviarMsg(sock, chatId, { text: 'Digite *CONFIRMAR* para publicar ou *CANCELAR* para voltar.' });
+        return;
+      }
+    }
+
+    // /party seleciona até 9 pessoas mencionadas para o quiz atual.
+    if (isGroup && textoLower.startsWith('/party')) {
+      const quiz = quizAtual;
+
+      if (!quiz || quiz.grupoId !== chatId || quiz.fase !== 'aguardandoParty') {
+        await enviarMsg(sock, chatId, { text: '❌ Você não tem um quiz esperando participantes neste grupo.' });
+        return;
+      }
+
+      const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      const mencionados = idsUnicos(mentionedJid);
+
+      if (!mencionados.length) {
+        await enviarMsg(sock, chatId, { text: '👥 Mencione as pessoas. Exemplo: */party @pessoa1 @pessoa2*' });
+        return;
+      }
+
+      if (mencionados.length > 9) {
+        await enviarMsg(sock, chatId, { text: '⚠️ O /party aceita no máximo *9 pessoas mencionadas*.' });
+        return;
+      }
+
+      quiz.participantes = idsUnicos([remetenteId, ...mencionados]);
+      quiz.fase = 'confirmarPublicacao';
+
+      const lista = quiz.participantes.map((id) => `• @${id.split('@')[0]}`).join('\n');
+
+      await enviarMsg(sock, chatId, {
+        text:
+          `╔════════════════════╗\n` +
+          `      🎯 *PARTY DO QUIZ*\n` +
+          `╚════════════════════╝\n\n` +
+          `👥 *Participantes (${quiz.participantes.length}):*\n${lista}\n\n` +
+          `✅ Agora mande *CONFIRMAR* no seu PV comigo.\n` +
+          `❌ Para cancelar, mande *CANCELAR* no PV.`,
+        mentions: quiz.participantes,
+      });
+      return;
+    }
+
+    // Respostas e confirmação final do quiz no grupo.
+    if (isGroup) {
+      const quizzesDoGrupo = Object.values(quizzesAtivos).filter((q) => q.grupoId === chatId && q.fase === 'emJogo');
+
+      for (const quiz of quizzesDoGrupo) {
+        const elegivel = quiz.modoParticipacao === 'grupo'
+          ? quiz.participantes.includes(remetenteId)
+          : quiz.participantes.includes(remetenteId);
+
+        if (!elegivel) continue;
+
+        if (textoLower === 'confirm' && remetenteId === quiz.criadorId) {
+          await revelarResultadoQuiz(sock, quiz);
+          return;
+        }
+
+        const respostas = extrairRespostasParticipante(textoLimpo, quiz.perguntas.length);
+        if (!Object.keys(respostas).length) continue;
+
+        quiz.respostasParticipantes[remetenteId] ||= {};
+        Object.assign(quiz.respostasParticipantes[remetenteId], respostas);
+
+        await enviarMsg(sock, chatId, {
+          text:
+            `✅ @${remetenteId.split('@')[0]} respondeu ${Object.keys(respostas).length} pergunta(s)!\n` +
+            `📌 Você pode enviar respostas novas ou corrigir as anteriores.\n` +
+            `🏁 O resultado será revelado quando o criador enviar *confirm*.`,
+          mentions: [remetenteId],
+        });
+        return;
+      }
+    }
 
     // Dá um pouco de XP por usar qualquer comando, se o RPG tiver ativado nesse grupo
     // (duelo tem sua própria recompensa de XP, então não soma aqui também)
