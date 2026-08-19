@@ -140,6 +140,11 @@ const MENSAGEM_MENU = `╔══════════════════
 ┗━━━━━━━━━━━━━━━━━━━┈
 
 ┏━━━〔 🎮 DIVERSÃO 〕━━━┈
+┃ 🧠 /quiz
+┃ ➥ Cria um quiz de até 10 perguntas
+┃ 👥 /party @pessoa
+┃ ➥ Escolhe até 9 participantes do quiz
+┃
 ┃ 🤗 /hug @pessoa
 ┃ ➥ Manda um abraço
 ┃
