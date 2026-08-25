@@ -2278,32 +2278,83 @@ async function iniciarBot() {
     // /menu — menu principal. Configurações do RPG ficam somente no /rpg.
     if (texto.trim().toLowerCase() === '/menu') {
       await enviarMsg(sock, chatId, {
-        text: `╭━━━〔 🤖 *COGB-AI* 〕━━━╮\n` +
-          `┃ ✨ *MENU PRINCIPAL*\n` +
+        text: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `┃ 🤖 *CHAIM-BOT*           ┃\n` +
+          `┃ ✨ *MENU PRINCIPAL*      ┃\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `👋 *Olá! Eu sou o Chaim-Bot!*\n\n` +
+          `🚀 *Diversão • IA • RPG • Figurinhas*\n` +
+          `Escolha uma categoria e use o comando desejado.\n\n` +
+          `╭━━〔 🎮 *BRINCADEIRAS* 〕━━╮\n` +
+          `┃ 💀 */forca*\n` +
+          `┃ └ Jogo da Forca\n` +
+          `┃ 🧠 */quiz*\n` +
+          `┃ └ Crie ou participe de quizzes\n` +
+          `┃ ⚔️ */duelo*\n` +
+          `┃ └ Desafie outros jogadores\n` +
+          `┃ 🏆 */tops*\n` +
+          `┃ └ Veja os rankings\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `╭━━〔 🎵 *MÚSICA* 〕━━╮\n` +
+          `┃ 🎵 */play <música>*\n` +
+          `┃ └ Encontre e reproduza músicas\n` +
           `╰━━━━━━━━━━━━━━━━━━━━╯\n\n` +
-          `🎮 *BRINCADEIRAS*\n` +
-          `├ 💀 /forca — Jogo da Forca\n` +
-          `├ 🧠 /quiz — Criar/Jogar Quiz\n` +
-          `├ ⚔️ /duelo — Duelo entre jogadores\n` +
-          `└ 🏆 /tops — Ranking das brincadeiras\n\n` +
-          `🎵 *MÚSICA*\n` +
-          `└ 🎵 /play <música> — Procurar e tocar uma música\n\n` +
-          `🎨 *FIGURINHAS & PACKS*\n` +
-          `├ ✨ /create fig — Criar figurinha\n` +
-          `├ 📦 /create pack — Criar um pack\n` +
-          `├ 🎁 /pack <tema> — Procurar um pack por tema\n` +
-          `├ 🔎 /packs <tema> — Procurar packs\n` +
-          `└ 🔄 /convert — Converter mídia\n\n` +
-          `🤖 *UTILIDADES*\n` +
-          `├ 📋 /updates — Ver atualizações\n` +
-          `├ 💡 /feedback <mensagem> — Enviar sugestão\n` +
-          `└ 🖼️ /imagem — Gerar imagem\n\n` +
-          `⚔️ *RPG*\n` +
-          `└ 🐉 /rpg — Abrir o painel do RPG\n\n` +
-          `💡 *Dica:* você não precisa escrever o comando perfeitamente.\n` +
-          `O bot tenta corrigir pequenos erros automaticamente!\n\n` +
-          `📌 *Exemplo:* /creat fig → /create fig\n` +
-          `📌 /paly música → /play música`,
+          `╭━━〔 🎨 *FIGURINHAS & PACKS* 〕━━╮\n` +
+          `┃ ✨ */create fig*\n` +
+          `┃ └ Crie uma figurinha\n` +
+          `┃ 📦 */create pack*\n` +
+          `┃ └ Monte seu próprio pack\n` +
+          `┃ 🎁 */pack*\n` +
+          `┃ └ Encontre figurinhas por tema\n` +
+          `┃ 🔎 */packs*\n` +
+          `┃ └ Pesquise packs disponíveis\n` +
+          `┃ 🔄 */convert*\n` +
+          `┃ └ Converta mídias e figurinhas\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `╭━━〔 🤖 *IA & UTILIDADES* 〕━━╮\n` +
+          `┃ 🧠 */ia*\n` +
+          `┃ └ Converse com a inteligência artificial\n` +
+          `┃ ❓ */ask*\n` +
+          `┃ └ Tire suas dúvidas\n` +
+          `┃ 🔥 */roast @pessoa*\n` +
+          `┃ └ Faça uma zoeira com alguém\n` +
+          `┃ 📖 */story*\n` +
+          `┃ └ Crie histórias\n` +
+          `┃ 🌎 */translate*\n` +
+          `┃ └ Traduza textos\n` +
+          `┃ 📝 */resumo*\n` +
+          `┃ └ Resuma textos\n` +
+          `┃ 🖼️ */imagine <descrição>*\n` +
+          `┃ └ Gere imagens por descrição\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `╭━━〔 ⚔️ *SISTEMA DE RPG* 〕━━╮\n` +
+          `┃ 🐉 */rpg*\n` +
+          `┃ └ Abra o painel do RPG\n` +
+          `┃ ⚔️ *Duelo • XP • Perfil*\n` +
+          `┃ └ Sistema de RPG em grupos\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `╭━━〔 🛠️ *OUTROS* 〕━━╮\n` +
+          `┃ 📋 */updates*\n` +
+          `┃ └ Confira as novidades\n` +
+          `┃ 💡 */feedback*\n` +
+          `┃ └ Envie sugestões ou feedbacks\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+          `┃ 💡 *DICA DO CHAIM-BOT*   ┃\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `🤖 *Errou ao digitar um comando?* Sem problema!\n` +
+          `O Chaim-Bot tenta identificar e corrigir pequenos erros. ✨\n\n` +
+          `📌 *Exemplos:*\n\n` +
+          `❌ */creat fig*\n` +
+          `✅ */create fig*\n\n` +
+          `❌ */paly música*\n` +
+          `✅ */play música*\n\n` +
+          `❌ */resumoo texto*\n` +
+          `✅ */resumo texto*\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `🌟 *CHAIM-BOT* 🎮 Jogos • 🤖 IA • 🎨 Figurinhas\n` +
+          `🎵 Música • ⚔️ RPG • ✨ Muito mais\n\n` +
+          `💬 *Digite um comando e comece!*`,
       });
       return;
     }
