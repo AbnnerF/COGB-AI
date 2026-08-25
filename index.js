@@ -140,7 +140,7 @@ function distanciaLevenshtein(a, b) {
 }
 
 const COMANDOS_CORRIGIVEIS = [
-  'menu', 'play', 'audio', 'fig', 'forca', 'duelo', 'tops', 'top',
+  'menu', 'updates', 'update', 'play', 'audio', 'fig', 'forca', 'duelo', 'tops', 'top',
   'pack', 'packs', 'convert', 'quiz', 'party', 'feedback', 'ligado',
   'rpg', 'levels', 'inimigos', 'inimigo', 'historia', 'história', 'inventario', 'inventário', 'battle', 'party', 'create', 'cancel', 'perfil', 'hug', 'punch', 'imagem', 'img',
 ];
@@ -2250,20 +2250,60 @@ async function iniciarBot() {
       return;
     }
 
-    // Comando /menu - mostra o tutorial com todas as funções (funciona em grupo ou no privado)
+    // /updates — novidades atuais do bot
+    if (texto.trim().toLowerCase() === '/updates' || texto.trim().toLowerCase() === '/update') {
+      await enviarMsg(sock, chatId, {
+        text: `🚀 *ATUALIZAÇÕES DO COGB-AI*\n\n` +
+          `🎵 *Música*\n` +
+          `• /play — pesquisa músicas por nome ou link\n` +
+          `• Busca aproximada para nomes digitados errado\n` +
+          `• Links do Spotify podem ser usados para identificar a faixa\n\n` +
+          `🎮 *Brincadeiras*\n` +
+          `• /forca — jogo da Forca\n` +
+          `• /quiz — sistema de Quiz\n` +
+          `• /duelo — duelos entre jogadores\n` +
+          `• /tops — ranking das brincadeiras\n\n` +
+          `🎨 *Figurinhas*\n` +
+          `• /create fig — cria figurinha\n` +
+          `• /create pack — cria packs com fotos e vídeos\n` +
+          `• /pack <tema> — procura packs por tema\n` +
+          `• /packs <tema> — encontra packs disponíveis\n\n` +
+          `⚔️ *RPG*\n` +
+          `• Sistema de níveis, XP, inventário, inimigos, batalhas e história.\n\n` +
+          `🤖 *Também temos correção automática de pequenos erros nos comandos.*`,
+      });
+      return;
+    }
+
+    // /menu — menu principal. Configurações do RPG ficam somente no /rpg.
     if (texto.trim().toLowerCase() === '/menu') {
       await enviarMsg(sock, chatId, {
-        text: MENSAGEM_MENU +
-          '\n\n🎮 */forca* — jogar Forca no grupo' +
-          '\n🏆 */tops* — ranking geral das brincadeiras' +
-          '\n🏅 */tops forca* | */tops quiz* | */tops duelo* — rankings por jogo' +
-          '\n\n⚔️ *RPG*' +
-          '\n🎮 */rpg* — ativar RPG da comunidade' +
-          '\n📊 */levels* — nível e XP' +
-          '\n👹 */inimigos* — inimigos e encontros' +
-          '\n📖 */historia* — campanha' +
-          '\n🎒 */inventario* — itens' +
-          '\n⚔️ */battle* — batalha',
+        text: `╭━━━〔 🤖 *COGB-AI* 〕━━━╮\n` +
+          `┃ ✨ *MENU PRINCIPAL*\n` +
+          `╰━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+          `🎮 *BRINCADEIRAS*\n` +
+          `├ 💀 /forca — Jogo da Forca\n` +
+          `├ 🧠 /quiz — Criar/Jogar Quiz\n` +
+          `├ ⚔️ /duelo — Duelo entre jogadores\n` +
+          `└ 🏆 /tops — Ranking das brincadeiras\n\n` +
+          `🎵 *MÚSICA*\n` +
+          `└ 🎵 /play <música> — Procurar e tocar uma música\n\n` +
+          `🎨 *FIGURINHAS & PACKS*\n` +
+          `├ ✨ /create fig — Criar figurinha\n` +
+          `├ 📦 /create pack — Criar um pack\n` +
+          `├ 🎁 /pack <tema> — Procurar um pack por tema\n` +
+          `├ 🔎 /packs <tema> — Procurar packs\n` +
+          `└ 🔄 /convert — Converter mídia\n\n` +
+          `🤖 *UTILIDADES*\n` +
+          `├ 📋 /updates — Ver atualizações\n` +
+          `├ 💡 /feedback <mensagem> — Enviar sugestão\n` +
+          `└ 🖼️ /imagem — Gerar imagem\n\n` +
+          `⚔️ *RPG*\n` +
+          `└ 🐉 /rpg — Abrir o painel do RPG\n\n` +
+          `💡 *Dica:* você não precisa escrever o comando perfeitamente.\n` +
+          `O bot tenta corrigir pequenos erros automaticamente!\n\n` +
+          `📌 *Exemplo:* /creat fig → /create fig\n` +
+          `📌 /paly música → /play música`,
       });
       return;
     }
