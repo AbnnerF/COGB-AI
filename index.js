@@ -42,7 +42,7 @@ const {
 const estado = require('./estado');
 const tops = require('./tops');
 const rpg = require('./rpg');
-const pokemon = require('./src/pokemon');
+const pokemon = require('./pokemon');
 
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // número que autoriza o bot em novos grupos, ex: 5511999999999
 const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
