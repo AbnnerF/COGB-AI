@@ -99,95 +99,262 @@ Também posso criar figurinhas animadas! 🎞️🔥
 
 ⚡ Chaim-Bot — agora fazendo parte do grupo! 🤖💙`;
 
-const MENSAGEM_MENU = `╔══════════════════╗
-   🤖 *CHAIM-BOT*
-╚══════════════════╝
+const MENSAGEM_MENU = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃ 🤖 *CHAIM-BOT*             ┃
+┃ ✨ *MENU COMPLETO*         ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-🛠️ *Prefixo:* [ / ]
-📞 *Contato:* +55 65 99679-9870
+👋 *Olá! Seja bem-vindo ao Chaim-Bot!*
 
-┏━━━〔 🎨 FIGURINHAS 〕━━━┈
-┃ 🖼️ /create fig
-┃ ➥ Cria figurinha a partir de foto, vídeo ou GIF
-┃
-┃ 🎨 /fig <descrição>
-┃ ➥ Cria figurinha do zero, com IA
-┃
-┃ 🔄 /convert
-┃ ➥ Converte figurinha de volta em foto/vídeo
-┗━━━━━━━━━━━━━━━━━━━┈
+📚 Aqui estão todos os meus comandos, separados por categorias para facilitar sua navegação! 👇
 
-┏━━━〔 🎵 ÁUDIO 〕━━━━┈
-┃ 🎬 /audio
-┃ ➥ Extrai áudio de vídeo ou link do YouTube
-┗━━━━━━━━━━━━━━━━━━━┈
+━━━━━━━━━━━━━━━━━━━━━━
+🎮 *DIVERSÃO & BRINCADEIRAS*
+━━━━━━━━━━━━━━━━━━━━━━
 
-┏━━━〔 🤖 INTELIGÊNCIA ARTIFICIAL 〕━━━┈
-┃ 💬 /ia <pergunta> ou /ask <pergunta>
-┃ ➥ Conversa direto com a IA
-┃
-┃ 📖 /story <tema>
-┃ ➥ Cria uma historinha curta
-┃
-┃ 🌐 /translate <texto>
-┃ ➥ Traduz (PT ↔ outros idiomas)
-┃
-┃ 📝 /resumo <texto>
-┃ ➥ Resume um texto grande
-┃
-┃ 🖼️ /imagine <descrição>
-┃ ➥ Gera uma imagem com IA
-┗━━━━━━━━━━━━━━━━━━━┈
+/forca
+└─ 🎯 Jogo da Forca
 
-┏━━━〔 🎮 DIVERSÃO 〕━━━┈
-┃ 🧠 /quiz
-┃ ➥ Cria um quiz de até 10 perguntas
-┃ 👥 /party @pessoa
-┃ ➥ Escolhe até 9 participantes do quiz
-┃
-┃ 🤗 /hug @pessoa
-┃ ➥ Manda um abraço
-┃
-┃ 👊 /punch @pessoa
-┃ ➥ Dá um soco (de brincadeira!)
-┃
-┃ 🔥 /roast @pessoa
-┃ ➥ IA cria uma zoeira leve
-┃
-┃ ⭐ /rate @pessoa
-┃ ➥ Dá uma nota aleatória
-┃
-┃ 🎲 /dado
-┃ ➥ Rola um dado de 1 a 6
-┃
-┃ 🪙 /coin
-┃ ➥ Cara ou coroa
-┗━━━━━━━━━━━━━━━━━━━┈
+/quiz
+└─ 🧠 Quiz
 
-┏━━━〔 ⚔️ RPG (se ativado no grupo) 〕━━━┈
-┃ ⚔️ /duelo @pessoa
-┃ ➥ Batalha aleatória por XP e vitórias
-┃
-┃ 👤 /perfil
-┃ ➥ Mostra seu nível, XP, vitórias e derrotas
-┃
-┃ ✨ Usar comandos também dá XP!
-┗━━━━━━━━━━━━━━━━━━━┈
+/duelo @pessoa
+└─ ⚔️ Desafie alguém
 
-┏━━━〔 ⚙️ OUTROS 〕━━━━┈
-┃ 📋 /menu
-┃ ➥ Mostra esse menu
-┃
-┃ 📝 /feedback <mensagem>
-┃ ➥ Manda sugestão, elogio ou reclamação
-┗━━━━━━━━━━━━━━━━━━━┈
+/tops
+└─ 🏆 Ranking geral
 
-👥 Quer o Chaim-Bot no seu grupo?
-📞 +55 65 99679-9870
+/dado
+└─ 🎲 Rolar um dado
 
-╔════════════╗
-   💙 *CHAIM-BOT*
-╚════════════╝`;
+/moeda
+└─ 🪙 Jogar moeda
+
+/caraoucoroa
+└─ 🪙 Cara ou coroa
+
+/hug @pessoa
+└─ 🤗 Abraçar alguém
+
+/punch @pessoa
+└─ 👊 Interagir com alguém
+
+/kiss @pessoa
+└─ 💋 Dar um beijo
+
+/kill @pessoa
+└─ 💀 Eliminação fictícia
+
+━━━━━━━━━━━━━━━━━━━━━━
+🃏 *UNO*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/uno
+└─ 🃏 Abrir o UNO
+
+/party uno @pessoas
+└─ 👥 Definir participantes
+
+/uno start
+└─ ▶️ Iniciar partida
+
+/uno status
+└─ 📊 Ver status
+
+/uno jogar <número>
+└─ 🃏 Jogar carta
+
+/comprar
+└─ ➕ Comprar carta
+
+/uno cancelar
+└─ ❌ Cancelar partida
+
+━━━━━━━━━━━━━━━━━━━━━━
+🎵 *MÚSICA*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/play <música>
+└─ 🎵 Buscar música
+
+/audio
+└─ 🎧 Extrair áudio
+
+/music call
+└─ 📞 Música em call
+
+━━━━━━━━━━━━━━━━━━━━━━
+🎨 *FIGURINHAS & PACKS*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/create fig
+└─ 🖼️ Criar figurinha
+
+/create pack
+└─ 📦 Criar um pack
+
+/pack <tema>
+└─ 🎨 Buscar figurinhas por tema
+
+/packs <tema>
+└─ 🔎 Pesquisar packs
+
+/convert
+└─ 🔄 Converter figurinhas
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 *INTELIGÊNCIA ARTIFICIAL*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/bot
+└─ 🤖 Ativar o participante virtual
+
+/ia <texto>
+└─ 💬 Conversar com a IA
+
+/ask <texto>
+└─ ❓ Fazer uma pergunta
+
+/roast @pessoa
+└─ 🔥 Zoar alguém
+
+/story <texto>
+└─ 📖 Criar uma história
+
+/translate <texto>
+└─ 🌎 Traduzir texto
+
+/resumo <texto>
+└─ 📝 Resumir texto
+
+/imagine <descrição>
+└─ 🎨 Gerar imagem
+
+/rate @pessoa
+└─ ⭐ Avaliar alguém
+
+━━━━━━━━━━━━━━━━━━━━━━
+🐾 *POKÉMON — BETA 0.1*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/pokemon
+└─ 🐾 Abrir painel
+
+/choose 1/2/3
+└─ 🎒 Escolher inicial
+
+/pokemons
+└─ 👥 Ver sua equipe
+
+/mapa
+└─ 🗺️ Ver localização
+
+/viajar
+└─ 🚶 Explorar o mundo
+
+/capturar
+└─ 🎯 Capturar Pokémon
+
+/shop
+└─ 🛒 Abrir loja
+
+/buy <número>
+└─ 💰 Comprar item
+
+/help p
+└─ 📚 Ajuda do sistema
+
+━━━━━━━━━━━━━━━━━━━━━━
+🚀 *AMONG US*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/amongus
+└─ 🚀 Abrir partida
+
+/party amongus @pessoas
+└─ 👥 Definir participantes
+
+/amongus start
+└─ ▶️ Começar partida
+
+/tarefa
+└─ 📝 Realizar tarefa
+
+/amongus status
+└─ 📊 Ver status
+
+/amongus report
+└─ 🚨 Reportar reunião
+
+/vote @pessoa
+└─ 🗳️ Votar
+
+/skip
+└─ ⏭️ Pular votação
+
+/amongus cancel
+└─ ❌ Cancelar partida
+
+━━━━━━━━━━━━━━━━━━━━━━
+⚔️ *RPG*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/rpg
+└─ ⚔️ Abrir sistema RPG
+
+/levels
+└─ 📈 XP e níveis
+
+/inimigos
+└─ 👹 Ver inimigos
+
+/historia
+└─ 📖 Modo história
+
+/inventario
+└─ 🎒 Ver inventário
+
+/battle @pessoa
+└─ ⚔️ Batalha PvP — até 4v4
+
+/party history
+└─ 👥 Definir participantes
+
+━━━━━━━━━━━━━━━━━━━━━━
+📞 *CALL & SISTEMA*
+━━━━━━━━━━━━━━━━━━━━━━
+
+/call
+└─ 📞 Função experimental
+
+/updates
+└─ 🆕 Ver novidades
+
+/feedback <texto>
+└─ 📝 Enviar feedback
+
+/ligado
+└─ 🟢 Ver status do bot
+
+━━━━━━━━━━━━━━━━━━━━━━
+✨ *CORREÇÃO AUTOMÁTICA*
+━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 O Chaim-Bot tenta entender pequenos erros de digitação nos comandos!
+
+Exemplos:
+
+❌ /creat fig
+✅ /create fig
+
+❌ /paly
+✅ /play
+
+━━━━━━━━━━━━━━━━━━━━━━
+💙 *CHAIM-BOT*
+🤖 Diversão, sistemas e novidades em um só lugar!
+
+✨ *Digite um comando e aproveite!*`;
 
 const MENSAGEM_GRUPO_PENDENTE = `⚠️🤖 AVISO — CHAIM-BOT
 
