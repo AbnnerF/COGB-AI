@@ -77,30 +77,30 @@ function pontuarResultadoMusica(consulta, titulo) {
 
 // Retorna os melhores candidatos do YouTube. Usamos mais de um resultado
 // para saber quando a busca por nome está ambígua.
-async function pesquisarMusicasNoYoutube(consulta, limite = 5) {
-  const termo = String(consulta || '').trim();
-  if (!termo) return [];
+ função  assíncrona pesquisarMúsicasNoYoutube ( consulta , limite = 5 )  {
+  const  termo = String ( consulta || '' ) . aparar ( ) ;
+  se  ( ! termo )  retorne  [ ] ;
 
-  try {
-    const { stdout } = await execFileAsync('yt-dlp', [
-      '--js-runtimes', 'node',
-      '--flat-playlist',
-      '--print', '%(id)s\t%(title)s',
-      '--skip-download',
-      '--playlist-end', String(limite),
-      `ytsearch${limite}:${termo}`,
-    ], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+  tentar  {
+    const  {  stdout  } = await  execFileAsync ( 'yt-dlp' , [
+      '--js-runtimes' , 'node' ,
+      '--flat-playlist' ,
+      '--print' , '%(id)s \t %(title)s' ,
+      '--skip-download' ,
+      '--playlist-end' , String ( limite ) ,
+      `ytsearch ${ limite } : ${ termo } ` ,
+    ] , {  timeout : 60000 , maxBuffer : 2 * 1024 * 1024  } ) ;
 
-    return stdout.trim().split(/\r?\n/).filter(Boolean).map(linha => {
-      const [id, ...tituloPartes] = linha.split('\t');
-      const titulo = tituloPartes.join('\t').trim();
-      if (!id || !/^[\w-]{6,}$/.test(id)) return null;
-      return { id, titulo: titulo || termo, url: `https://www.youtube.com/watch?v=${id}` };
-    }).filter(Boolean).map(r => ({
-      ...r,
-      pontuacao: pontuarResultadoMusica(termo, r.titulo),
-    })).sort((a, b) => b.pontuacao - a.pontuacao);
-  } catch (err) {
+    return  stdout.trim ( ) . split ( /\r ? \n / ) . filter ( Boolean ) .map ( linha = > {
+      const  [ id , ... tituloPartes ] = linha . dividir ( ' \t ' ) ;
+      const  titulo = tituloPartes . articulação ' ) .​​​ aparar ( ) ;
+      if  ( ! id || ! /^[\w-]{6,}$/ . test ( id ) )  return  null ;
+      return  {  id , título : título || termo , url : `https://www.youtube.com/watch?v= ${ id } `  } ;
+    } ) . filtro ( Booleano ) . mapa ( r => ( {
+      ... r ,
+      pontuacao : pontuarResultadoMusica ( termo , r . titulo ) ,
+    } ) ) . sort ( ( a , b ) = > b.pontuação -a.pontuação ) ;​​​​
+  }  catch  ( err )  {
     console.log('Erro ao pesquisar música no YouTube:', err.message);
     return [];
   }
