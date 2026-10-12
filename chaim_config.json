@@ -1,0 +1,10 @@
+{
+  "versao": 1,
+  "mostrarErrosConsole": false,
+  "estilo": {
+    "girias": false,
+    "emojis": true,
+    "respostasCurtas": false
+  },
+  "grupos": {}
+}
