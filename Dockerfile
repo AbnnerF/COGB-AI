@@ -24,6 +24,8 @@ RUN npm install --omit=dev
 
 COPY . .
 
+RUN ls -la /app && test -f /app/index.js
+
 EXPOSE 3000
 
 CMD ["npm", "start"]
