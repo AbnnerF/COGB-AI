@@ -1,0 +1,9 @@
+version: 1
+type: worker
+
+build:
+  framework: dockerfile
+  dockerfile: Dockerfile
+
+run:
+  command: node --max-old-space-size=64 --max-semi-space-size=4 index.js
