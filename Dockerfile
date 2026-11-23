@@ -27,4 +27,4 @@ COPY . .
 RUN ls -la /app && test -f /app/index.js
 
 # node direto (sem npm) e heap limitado: o plano grátis do Deplexo tem só 128 MB de RAM
-CMD ["node", "--max-old-space-size=64", "--max-semi-space-size=4", "index.js"]
+CMD ["node", "--max-old-space-size=105", "index.js"]
