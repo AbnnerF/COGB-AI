@@ -6,4 +6,4 @@ build:
   dockerfile: Dockerfile
 
 run:
-  command: node --max-old-space-size=64 --max-semi-space-size=4 index.js
+  command: node --max-old-space-size=105 index.js
