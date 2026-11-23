@@ -15,26 +15,32 @@ const {
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const { gerarResposta, gerarRespostaComPrompt } = require('./chatbot');
+let stickerLib = {};
+try {
+  stickerLib = require('./sticker');
+} catch (e) {
+  console.log('⚠️ Módulo sticker.js não encontrado; funções de figurinha desativadas.');
+}
 const {
-  gerarFigurinha,
-  gerarPackDeFigurinhas,
-  adicionarMetadados,
-  pesquisarPacksStickerLy,
-  buscarFigurinhasPorTema,
-  buscarPackCompletoPorTema,
-  criarFigurinhaDeImagem,
-  criarFigurinhaAnimada,
-  converterFigurinhaParaImagem,
-  converterFigurinhaParaVideo,
-  converterVideoParaAudio,
-  converterGifParaVideo,
-  baixarAudioDoYoutube,
-  gerarImagem,
-  obterDimensoes,
-  obterDuracao,
-  ehDesproporcional,
-  DURACAO_MAXIMA_FIGURINHA,
-} = require('./sticker');
+  gerarFigurinha = async () => null,
+  gerarPackDeFigurinhas = async () => null,
+  adicionarMetadados = async (b) => b,
+  pesquisarPacksStickerLy = async () => [],
+  buscarFigurinhasPorTema = async () => [],
+  buscarPackCompletoPorTema = async () => null,
+  criarFigurinhaDeImagem = async () => null,
+  criarFigurinhaAnimada = async () => null,
+  converterFigurinhaParaImagem = async () => null,
+  converterFigurinhaParaVideo = async () => null,
+  converterVideoParaAudio = async () => null,
+  converterGifParaVideo = async () => null,
+  baixarAudioDoYoutube = async () => null,
+  gerarImagem = async () => null,
+  obterDimensoes = async () => ({ width: 512, height: 512 }),
+  obterDuracao = async () => 0,
+  ehDesproporcional = () => false,
+  DURACAO_MAXIMA_FIGURINHA = 10,
+} = stickerLib;
 const {
   MENSAGEM_BOAS_VINDAS_PV,
   MENSAGEM_NOVA_FUNCAO_CONVERT,
@@ -983,36 +989,38 @@ async function iniciarBot() {
 
     if (connection) {
       console.log(`🔎 [DIAGNÓSTICO] connection = ${connection}`);
-      if (connection === 'connecting') recebeuConnecting = true;
+      if (connection === 'connecting') {
+        recebeuConnecting = true;
+        if (!state.creds.registered && BOT_NUMBER && !codigoPareamentoSolicitado && !solicitacaoPareamentoEmAndamento) {
+          solicitacaoPareamentoEmAndamento = true; // impede chamadas duplicadas enquanto aguarda
+          setTimeout(() => {
+            solicitarCodigo().catch((err) => {
+              console.log('❌ [DIAGNÓSTICO] Erro inesperado no pareamento:', err?.message || err);
+              codigoPareamentoSolicitado = false;
+              solicitacaoPareamentoEmAndamento = false;
+              if (socketAtual === sock) socketAtual = null;
+              clearTimeout(diagnosticoTimeout);
+              try {
+                sock.ws?.close?.();
+              } catch (_) {}
+              console.log('🛑 Pareamento pausado para evitar gerar códigos em sequência. Reinicie o serviço manualmente após conferir o erro.');
+            });
+          }, 2000);
+        }
+      }
     }
 
     if (qr) {
       recebeuQr = true;
       console.log(`🔎 [DIAGNÓSTICO] QR recebido: SIM (tamanho ${String(qr).length})`);
-      console.log('📱 QR Code de pareamento recebido. Abra o WhatsApp Business > Aparelhos conectados > Conectar aparelho.');
-      try {
-        qrcode.generate(qr, { small: true });
-      } catch (qrErr) {
-        console.log(`⚠️ Não foi possível desenhar o QR nos registros: ${qrErr?.message || qrErr}`);
-      }
-    }
-
-    // Solicita o código somente depois que o Baileys entregar um QR válido.
-    // O evento 'connecting' sozinho não garante que o WebSocket esteja pronto;
-    // chamar requestPairingCode nesse estágio pode resultar em conexão fechada (428).
-    if (qr && !state.creds.registered && BOT_NUMBER && !codigoPareamentoSolicitado && !solicitacaoPareamentoEmAndamento) {
-      solicitacaoPareamentoEmAndamento = true; // impede chamadas duplicadas enquanto aguarda
-      solicitarCodigo().catch((err) => {
-        console.log('❌ [DIAGNÓSTICO] Erro inesperado no pareamento:', err?.message || err);
-        codigoPareamentoSolicitado = false;
-        solicitacaoPareamentoEmAndamento = false;
-        if (socketAtual === sock) socketAtual = null;
-        clearTimeout(diagnosticoTimeout);
+      if (!BOT_NUMBER) {
+        console.log('📱 QR Code de pareamento recebido. Abra o WhatsApp Business > Aparelhos conectados > Conectar aparelho.');
         try {
-          sock.ws?.close?.();
-        } catch (_) {}
-        console.log('🛑 Pareamento pausado para evitar gerar códigos em sequência. Reinicie o serviço manualmente após conferir o erro.');
-      });
+          qrcode.generate(qr, { small: true });
+        } catch (qrErr) {
+          console.log(`⚠️ Não foi possível desenhar o QR nos registros: ${qrErr?.message || qrErr}`);
+        }
+      }
     }
 
     if (connection === 'close') {
@@ -3320,3 +3328,4 @@ Depois use */uno start* para começar.`,
 
 iniciarBot();
 
+Analisando
