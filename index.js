@@ -54,17 +54,13 @@ const tops = require('./tops');
 const rpg = require('./rpg');
 const pokemon = require('./pokemon');
 
-const ADMIN_NUMBER = process.env.ADMIN_NUMBER; // número que autoriza o bot em novos grupos, ex: 5511999999999
-const BOT_NUMBER = process.env.BOT_NUMBER; // número do chip que o bot vai usar, ex: 5511988887777
+const ADMIN_NUMBER = process.env.ADMIN_NUMBER;
+const BOT_NUMBER = process.env.BOT_NUMBER;
 
-// Criador fixo do Chaim-Bot. ADMIN_NUMBER continua sendo usado para autorização de grupos.
 const NUMERO_CRIADOR = '5565996799870';
 function numeroBaseJid(jid) { return String(jid || '').split('@')[0].split(':')[0].replace(/\D/g, ''); }
 function ehCriador(remetenteId) { return numeroBaseJid(remetenteId) === NUMERO_CRIADOR; }
 
-
-// -------------------- /PLAY + CORREÇÃO DE COMANDOS --------------------
-// Procura uma música no YouTube mesmo quando o nome não está 100% correto.
 function normalizarBuscaMusica(texto) {
   return String(texto || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -82,8 +78,6 @@ function pontuarResultadoMusica(consulta, titulo) {
   return encontrados / a.length;
 }
 
-// Retorna os melhores candidatos do YouTube. Usamos mais de um resultado
-// para saber quando a busca por nome está ambígua.
 async function pesquisarMusicasNoYoutube(consulta, limite = 5) {
   const termo = String(consulta || '').trim();
   if (!termo) return [];
@@ -118,8 +112,6 @@ async function pesquisarMusicaNoYoutube(consulta) {
   return resultados[0] || null;
 }
 
-// Lê uma faixa do Spotify sem precisar de token: o endpoint oEmbed fornece
-// título/artista, e depois usamos esses dados para localizar o áudio no YouTube.
 async function obterDadosSpotify(url) {
   try {
     const resposta = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
@@ -135,7 +127,6 @@ async function obterDadosSpotify(url) {
   }
 }
 
-// Distância de edição simples para corrigir pequenos erros de digitação.
 function distanciaLevenshtein(a, b) {
   a = String(a || '').toLowerCase();
   b = String(b || '').toLowerCase();
@@ -170,7 +161,6 @@ function corrigirComandoDigitado(texto) {
   if (!comandoOriginal) return valor;
   if (COMANDOS_CORRIGIVEIS.includes(comandoOriginal)) return valor;
 
-  // Primeiro tenta corrigir apenas o nome do comando.
   let melhor = null;
   for (const candidato of COMANDOS_CORRIGIVEIS) {
     const distancia = distanciaLevenshtein(comandoOriginal, candidato);
@@ -185,35 +175,19 @@ function corrigirComandoDigitado(texto) {
   return partes.join(' ');
 }
 
-// Guarda quem pediu "/Create fig" e tá esperando mandar a foto (chave: "chatId:remetenteId")
 const aguardandoFoto = {};
-
-// Guarda o estado do /create pack por usuário/chat
-// chave -> { fase: 'quantidade'|'nome'|'fotos', total, nomePack, packId, figurinhas, timeoutHandle }
 const aguardandoPack = {};
+const aguardandoEscolhaFormato = {};
+const aguardandoConversao = {};
+const aguardandoAudio = {};
+const aguardandoArtistaPlay = {};
 
-// Guarda quem já mandou uma foto desproporcional e tá esperando escolher o formato
-const aguardandoEscolhaFormato = {}; // chave -> { bufferImagem, legenda, timeoutHandle }
-
-// Guarda quem pediu "/convert" e tá esperando mandar a figurinha
-const aguardandoConversao = {}; // chave -> timeoutHandle
-
-// Guarda quem pediu "/audio" e tá esperando mandar o vídeo (ou um link do YouTube)
-const aguardandoAudio = {}; // chave -> timeoutHandle
-
-// Guarda /play quando o nome da música ficou ambíguo e precisamos do artista.
-const aguardandoArtistaPlay = {}; // chave -> { consulta, timeoutHandle }
-
-// Reconhece links do YouTube (youtube.com/watch?v=... ou youtu.be/...)
 const REGEX_YOUTUBE = /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+\S*)/i;
 const REGEX_SPOTIFY = /(https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[^/]+\/)?track\/[A-Za-z0-9]+[^\s]*)/i;
 
-// Sistema de QUIZ: cada criador pode ter um quiz ativo por vez.
-// O estado fica em memória enquanto o bot está ligado.
 const quizzesAtivos = {};
-const rpgPendencias = {}; // escolhas de habilidade/alvo durante batalhas
+const rpgPendencias = {};
 
-// -------------------- MODO /BOT: PARTICIPANTE DO GRUPO --------------------
 const conversasBot = {};
 const botSilencioTimers = {};
 const botCooldownAte = {};
@@ -255,8 +229,6 @@ async function gerarRespostaBotSegura(chatId, promptSistema, mensagem) {
     console.log('Falha no modo /bot usando prompt; tentando fallback:', err.message);
   }
 
-  // Fallback para o gerador normal: evita que uma falha específica do wrapper
-  // de prompt faça o /bot parecer completamente morto.
   try {
     const resposta = await gerarResposta([
       { role: 'system', content: promptSistema },
@@ -275,7 +247,6 @@ async function tentarFalaEspontanea(sock, chatId) {
   const c = conversasBot[chatId];
   if (!c || Date.now() - c.ultimaMensagem < BOT_SILENCIO_MS - 50) return;
 
-  // Participante natural: entra em parte das conversas, sem responder a absolutamente tudo.
   if (Math.random() > 0.65) return;
 
   try {
@@ -326,12 +297,7 @@ ${contexto}`,
   );
 }
 
-
-// -------------------- JOGO DA FORCA --------------------
-// Um jogo ativo por grupo. O estado fica em memória enquanto o bot estiver ligado.
 const forcasAtivas = {};
-
-// Estados simples dos jogos sociais
 const unoAtivos = {};
 const amongUsAtivos = {};
 
@@ -380,7 +346,6 @@ function cartaAleatoria(arr) {
   return arr.splice(Math.floor(Math.random() * arr.length), 1)[0];
 }
 
-
 const BANCO_FORCA = [
   { categoria: '🎮 Jogos', palavras: ['SONIC', 'MARIO', 'MINECRAFT', 'ROBLOX', 'FORTNITE', 'POKEMON', 'TERRARIA', 'UNDERTALE', 'FNAF', 'ZELDA'] },
   { categoria: '🎬 Filmes', palavras: ['AVATAR', 'BATMAN', 'SUPERMAN', 'SHREK', 'TITANIC', 'MATRIX', 'GODZILLA', 'VENOM', 'DEADPOOL', 'HOMEMARANHA'] },
@@ -422,7 +387,6 @@ function mensagemForca(jogo, extra = '') {
   );
 }
 
-// Guarda os nomes dos contatos conforme o WhatsApp vai sincronizando
 const contatosCache = {};
 
 function salvarContato(contato) {
@@ -432,14 +396,11 @@ function salvarContato(contato) {
   }
 }
 
-// Espera 1 segundo antes de mandar uma mensagem, pra não parecer instantâneo/robótico
 async function enviarMsg(sock, chatId, conteudo) {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   await sock.sendMessage(chatId, conteudo);
 }
 
-// Envia um pacote de figurinhas de verdade (stickerPackMessage).
-// O projeto usa a variante do Baileys com suporte nativo a sticker packs.
 async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publisher = 'COGB-AI') {
   if (!Array.isArray(figurinhas) || !figurinhas.length) {
     throw new Error('O pack não possui figurinhas.');
@@ -463,8 +424,6 @@ async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publ
     },
   });
 }
-
-// -------------------- SISTEMA DE QUIZ --------------------
 
 function quizChaveCriador(criadorId) {
   return `quiz:${criadorId}`;
@@ -530,8 +489,6 @@ function extrairRespostasParticipante(texto, quantidadePerguntas) {
 function idsUnicos(ids) {
   return [...new Set((ids || []).filter(Boolean))];
 }
-
-// ------------------ FIM DO SISTEMA DE QUIZ ------------------
 
 async function publicarQuizNoGrupo(sock, quiz) {
   const chatId = quiz.grupoId;
@@ -684,9 +641,6 @@ async function revelarResultadoQuiz(sock, quiz) {
   } catch (err) {}
 }
 
-// Espera um tempo (parecendo "digitando...") antes de mandar a mensagem do chat casual (/Bot)
-
-// Finaliza o pack quando todas as mídias já foram escolhidas/processadas.
 async function finalizarPackCriado(sock, chatId, chaveEspera) {
   const sessaoPack = aguardandoPack[chaveEspera];
   if (!sessaoPack) return;
@@ -724,8 +678,6 @@ async function finalizarPackCriado(sock, chatId, chaveEspera) {
     });
   } catch (e) {
     console.log('O Baileys instalado não aceitou o formato de pack nativo:', e.message);
-    // O Baileys oficial não oferece suporte garantido ao formato de pack nativo
-    // usado por alguns forks. Envia as figurinhas individualmente como alternativa.
     let enviadas = 0;
     for (const item of figurinhasProntas) {
       try {
@@ -741,8 +693,6 @@ async function finalizarPackCriado(sock, chatId, chaveEspera) {
   }
 }
 
-// Processa uma única foto/vídeo do /create pack.
-// Se for desproporcional, pausa e espera a escolha antes de tocar na próxima.
 async function processarMidiaDoPack(sock, msg, chatId, chaveEspera) {
   const sessaoPack = aguardandoPack[chaveEspera];
   if (!sessaoPack) return;
@@ -817,8 +767,6 @@ async function processarMidiaDoPack(sock, msg, chatId, chaveEspera) {
   }
 }
 
-// No Deplexo, /app é somente leitura. A sessão do WhatsApp fica no volume persistente /data.
-// AUTH_DIR pode ser sobrescrito nas variáveis de ambiente do serviço.
 const AUTH_DIR = process.env.AUTH_DIR
   ? path.resolve(process.env.AUTH_DIR)
   : (fs.existsSync('/data') ? '/data/cogb-ai-auth' : path.join(__dirname, 'auth_info'));
@@ -828,8 +776,6 @@ let reconexaoAgendada = false;
 
 let tentativaConexao = 0;
 let temporizadorReconexao = null;
-// Controle do primeiro pareamento: se a conexão cair ANTES de mostrar o código,
-// tentamos de novo sozinhos (no máximo 5 vezes, com pausa crescente).
 let codigoJaExibido = false;
 let tentativasPrimeiroPareamento = 0;
 
@@ -872,7 +818,6 @@ async function iniciarBot() {
   console.log(`🔐 Sessão já registrada? ${state.creds.registered ? 'SIM' : 'NÃO'}`);
   console.log(`🔎 [DIAGNÓSTICO] Credenciais carregadas. Aguardando eventos do WhatsApp...`);
 
-  // Pega a versão atual do protocolo do WhatsApp (versão velha causa "Connection Failure").
   let versaoWA;
   try {
     const r = await fetchLatestBaileysVersion();
@@ -885,8 +830,6 @@ async function iniciarBot() {
   const sock = makeWASocket({
     auth: state,
     ...(versaoWA ? { version: versaoWA } : {}),
-    // Mantém o identificador de navegador compatível com Baileys.
-    // Não fixamos uma versão de protocolo antiga, que pode ser rejeitada pelo WhatsApp.
     browser: Browsers.ubuntu('Chrome'),
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
@@ -908,8 +851,6 @@ async function iniciarBot() {
 
   sock.ev.on('creds.update', saveCreds);
 
-  // Se o servidor não chegar nem ao QR depois de um tempo, mostramos isso
-  // explicitamente nos Registros. Não tentamos gerar um código às cegas.
   diagnosticoTimeout = setTimeout(() => {
     if (!recebeuQr && !recebeuOpen && !state.creds.registered) {
       console.log('');
@@ -921,8 +862,6 @@ async function iniciarBot() {
   }, 30000);
 
   const solicitarCodigo = async () => {
-    // O QR é o gatilho usado nesta versão para garantir que o socket chegou
-    // ao estágio de pareamento antes de requestPairingCode().
     if (codigoPareamentoSolicitado || state.creds.registered || !BOT_NUMBER) return;
 
     const numeroPareamento = String(BOT_NUMBER).replace(/\D/g, '');
@@ -983,7 +922,6 @@ async function iniciarBot() {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    // Diagnóstico seguro: mostramos apenas metadados, nunca o conteúdo do QR.
     const chaves = Object.keys(update || {}).join(', ');
     console.log(`🔎 [DIAGNÓSTICO] connection.update: [${chaves || 'sem campos'}]`);
 
@@ -992,7 +930,7 @@ async function iniciarBot() {
       if (connection === 'connecting') {
         recebeuConnecting = true;
         if (!state.creds.registered && BOT_NUMBER && !codigoPareamentoSolicitado && !solicitacaoPareamentoEmAndamento) {
-          solicitacaoPareamentoEmAndamento = true; // impede chamadas duplicadas enquanto aguarda
+          solicitacaoPareamentoEmAndamento = true;
           setTimeout(() => {
             solicitarCodigo().catch((err) => {
               console.log('❌ [DIAGNÓSTICO] Erro inesperado no pareamento:', err?.message || err);
@@ -1057,9 +995,6 @@ async function iniciarBot() {
           agendarReconexao('falha antes do código de pareamento');
           return;
         }
-        // Durante o primeiro pareamento, reconectar automaticamente recria o
-        // socket e solicita códigos novos em sequência. Pausamos para dar
-        // tempo de usar o código atual; uma nova tentativa é manual.
         codigoPareamentoSolicitado = true;
         clearTimeout(diagnosticoTimeout);
         console.log('🛑 Primeiro pareamento pausado: não vou gerar novos códigos automaticamente.');
@@ -1082,35 +1017,11 @@ async function iniciarBot() {
     }
   });
 
-  // Vai guardando os nomes reais dos contatos conforme o WhatsApp sincroniza
   sock.ev.on('contacts.upsert', (contatos) => contatos.forEach(salvarContato));
   sock.ev.on('contacts.update', (contatos) => contatos.forEach(salvarContato));
 
-  // Monta um relatório com todos os grupos conhecidos e o status de cada um
-  async function gerarRelatorioGrupos() {
-    const grupos = estado.listarGrupos();
-    const entradas = Object.entries(grupos);
-
-    if (entradas.length === 0) return '📋 Nenhum grupo registrado ainda.';
-
-    let texto = '📋 *Grupos conhecidos:*\n\n';
-    for (const [idGrupo, status] of entradas) {
-      let nome = idGrupo;
-      try {
-        const metadata = await sock.groupMetadata(idGrupo);
-        nome = metadata.subject || idGrupo;
-      } catch (err) {
-        // grupo pode ter sido apagado ou o bot removido de lá
-      }
-      const emoji = status === 'autorizado' ? '✅' : status === 'negado' ? '🚫' : '⏳';
-      texto += `${emoji} ${nome} — _${status}_\n`;
-    }
-    return texto;
-  }
-
-  // Pede autorização ao admin quando o bot é adicionado a um grupo (ou entra num criado agora)
   async function pedirAutorizacaoDoGrupo(chatId, nomeGrupo) {
-    if (estado.temStatusRegistrado(chatId)) return; // já processado antes, não pede de novo
+    if (estado.temStatusRegistrado(chatId)) return;
 
     estado.definirStatusGrupo(chatId, 'pendente');
     estado.adicionarNaFila(chatId);
@@ -1134,7 +1045,6 @@ async function iniciarBot() {
     }
   }
 
-  // Caso 1: bot adicionado a um grupo que já existia
   sock.ev.on('group-participants.update', async (evento) => {
     try {
       if (evento.action !== 'add') return;
@@ -1151,9 +1061,7 @@ async function iniciarBot() {
       try {
         const metadata = await sock.groupMetadata(evento.id);
         nomeGrupo = metadata.subject || nomeGrupo;
-      } catch (err) {
-        // sem problema se não conseguir pegar o nome
-      }
+      } catch (err) {}
 
       await pedirAutorizacaoDoGrupo(evento.id, nomeGrupo);
     } catch (err) {
@@ -1161,15 +1069,12 @@ async function iniciarBot() {
     }
   });
 
-  // Caso 2: bot já entra num grupo recém-criado (o criador já bota o bot como membro inicial)
   sock.ev.on('groups.upsert', async (grupos) => {
     for (const grupo of grupos) {
       try {
         const chatId = grupo.id;
-        if (estado.temStatusRegistrado(chatId)) continue; // já conhecido, ignora
+        if (estado.temStatusRegistrado(chatId)) continue;
 
-        // só trata como "acabou de entrar" se o grupo foi criado há pouco tempo
-        // (evita disparar autorização de novo pra grupos antigos sincronizados ao conectar)
         const criadoRecentemente = grupo.creation && Date.now() / 1000 - grupo.creation < 120;
         if (!criadoRecentemente) continue;
 
@@ -1184,11 +1089,9 @@ async function iniciarBot() {
     const msg = messages[0];
     if (!msg.message) return;
 
-    const chatId = msg.key.remoteJid; // grupo ou conversa
+    const chatId = msg.key.remoteJid;
     const isGroup = chatId.endsWith('@g.us');
 
-    // Comando especial: você (o dono) ativa um grupo pendente na mão, escrevendo
-    // "/Ligado" direto no grupo usando o próprio WhatsApp Business do número do bot
     if (msg.key.fromMe) {
       const textoProprio = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
       const comandoProprio = textoProprio.trim().toLowerCase();
@@ -1211,10 +1114,9 @@ async function iniciarBot() {
         try { await enviarMsg(sock, chatId, { text: '⚔️🎮 *RPG da comunidade ativado!*\n\nEste grupo é a central do RPG. Agora outros grupos podem ser registrados com */levels*, */inimigos*, */historia*, */inventario* e */battle*.' }); } catch (err) { console.log('Erro ao ativar RPG:', err.message); }
       }
 
-      return; // ignora o resto das próprias mensagens do bot
+      return;
     }
 
-    // Grupo ainda pendente ou recusado: bot fica quieto, não processa nada nesse grupo
     if (isGroup && estado.statusDoGrupo(chatId) !== 'autorizado') return;
 
     const remetenteId = msg.key.participant || msg.key.remoteJid;
@@ -1223,7 +1125,6 @@ async function iniciarBot() {
 
     const chaveEspera = `${chatId}:${remetenteId}`;
 
-    // Convite de grupo nativo (aquele card "Convite para grupo") mandado no privado do bot
     if (!isGroup && msg.message.groupInviteMessage) {
       const convite = msg.message.groupInviteMessage;
       const grupoJid = convite.groupJid;
@@ -1244,7 +1145,6 @@ async function iniciarBot() {
       return;
     }
 
-    // Se a pessoa já tinha pedido "/convert" e agora mandou a figurinha
     if (msg.message.stickerMessage && aguardandoConversao[chaveEspera]) {
       clearTimeout(aguardandoConversao[chaveEspera]);
       delete aguardandoConversao[chaveEspera];
@@ -1254,9 +1154,7 @@ async function iniciarBot() {
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema se não conseguir mostrar "digitando"
-      }
+      } catch (err) {}
 
       const resultado = ehAnimada
         ? await converterFigurinhaParaVideo(bufferFigurinha)
@@ -1271,7 +1169,6 @@ async function iniciarBot() {
       return;
     }
 
-    // Se a pessoa já tinha pedido "/audio" e agora mandou o vídeo
     if (msg.message.videoMessage && aguardandoAudio[chaveEspera]) {
       clearTimeout(aguardandoAudio[chaveEspera]);
       delete aguardandoAudio[chaveEspera];
@@ -1280,9 +1177,7 @@ async function iniciarBot() {
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema se não conseguir mostrar "digitando"
-      }
+      } catch (err) {}
 
       const audio = await converterVideoParaAudio(bufferVideo);
 
@@ -1295,13 +1190,9 @@ async function iniciarBot() {
       return;
     }
 
-    // Se a pessoa está criando um pack e mandou uma foto/vídeo.
-    // As mídias são processadas UMA POR VEZ, mesmo se a pessoa enviar várias de uma vez.
     if ((msg.message.imageMessage || msg.message.videoMessage) && aguardandoPack[chaveEspera]) {
       const sessaoPack = aguardandoPack[chaveEspera];
 
-      // Se já estamos processando uma mídia ou esperando a escolha da anterior,
-      // guarda as próximas na fila. Assim nunca aparecem várias perguntas 1/2/3 juntas.
       if (sessaoPack.processandoMidia || sessaoPack.fase === 'escolhendo_formato') {
         sessaoPack.filaMidias = sessaoPack.filaMidias || [];
         sessaoPack.filaMidias.push(msg);
@@ -1315,7 +1206,6 @@ async function iniciarBot() {
       }
     }
 
-    // Se a pessoa já tinha pedido "/Create fig" e agora mandou uma foto, vídeo ou GIF
     if ((msg.message.imageMessage || msg.message.videoMessage) && aguardandoFoto[chaveEspera]) {
       clearTimeout(aguardandoFoto[chaveEspera]);
       delete aguardandoFoto[chaveEspera];
@@ -1324,7 +1214,6 @@ async function iniciarBot() {
       const legenda = msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
       const bufferMidia = await downloadMediaMessage(msg, 'buffer', {});
 
-      // Se for vídeo (não GIF) e for mais longo que o permitido, avisa que vai cortar
       if (ehVideo && !msg.message.videoMessage.gifPlayback) {
         const duracao = await obterDuracao(bufferMidia).catch(() => null);
         if (duracao && duracao > DURACAO_MAXIMA_FIGURINHA) {
@@ -1336,7 +1225,6 @@ async function iniciarBot() {
 
       const dimensoes = await obterDimensoes(bufferMidia).catch(() => null);
 
-      // Se não é quadrado(a), pergunta como a pessoa quer o formato antes de criar
       if (dimensoes && ehDesproporcional(dimensoes)) {
         aguardandoEscolhaFormato[chaveEspera] = {
           bufferImagem: bufferMidia,
@@ -1360,9 +1248,7 @@ async function iniciarBot() {
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema se não conseguir mostrar "digitando"
-      }
+      } catch (err) {}
 
       const figurinha = ehVideo
         ? await criarFigurinhaAnimada(bufferMidia, legenda)
@@ -1377,8 +1263,6 @@ async function iniciarBot() {
       return;
     }
 
-    // Escolha do formato de uma mídia desproporcional dentro do /create pack.
-    // Depois da escolha, a próxima mídia da fila é processada.
     if (aguardandoPack[chaveEspera]?.fase === 'escolhendo_formato') {
       const sessaoPack = aguardandoPack[chaveEspera];
       const escolha = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim().toLowerCase();
@@ -1425,7 +1309,6 @@ async function iniciarBot() {
         text: `✅ ${recebidas}/${sessaoPack.total} mídia(s) recebida(s)!\n\nManda a próxima foto ou vídeo. 📸🎬\n\nPara cancelar: */cancel pack*`,
       });
 
-      // Agora sim, processa SOMENTE a próxima mídia que já estava na fila.
       const proxima = sessaoPack.filaMidias?.shift();
       if (proxima) {
         sessaoPack.processandoMidia = true;
@@ -1449,7 +1332,6 @@ async function iniciarBot() {
 
     const ehComandoRpg = ['/rpg','/levels','/inimigos','/inimigo','/historia','/história','/inventario','/inventário','/battle','/party','/criar'].includes(comando);
 
-    // ==================== /BOT PARTICIPANTE ====================
     if (isGroup && comando === '/bot') {
       const estadoBot = conversasBot[chatId] ||= { ativo: false, historico: [], ultimaMensagem: Date.now() };
       estadoBot.ativo = !estadoBot.ativo;
@@ -1469,7 +1351,6 @@ async function iniciarBot() {
       return;
     }
 
-    // Conversa normal no modo /bot. O bot registra tudo para manter contexto.
     if (isGroup && botAtivo(chatId) && !textoLower.startsWith('/')) {
       const nomeContexto = ehCriador(remetenteId) ? 'Criador' : nomeRemetente;
       registrarConversaBot(chatId, nomeContexto, textoLimpo);
@@ -1480,8 +1361,6 @@ async function iniciarBot() {
       const perguntaOuSaudacao = /[?？]$/.test(textoLimpo) ||
         /^(oi|olá|ola|bom dia|boa tarde|boa noite|eae|e aí|eai)\b/i.test(textoLimpo);
 
-      // Responde imediatamente quando chamado, quando é uma pergunta/saudação,
-      // ou quando o próprio Criador fala. O restante pode receber uma resposta espontânea.
       if (citouBot || perguntaOuSaudacao || ehCriador(remetenteId)) {
         try {
           await sock.sendPresenceUpdate('composing', chatId);
@@ -1498,7 +1377,6 @@ async function iniciarBot() {
       return;
     }
 
-    // Ativação inicial: somente o dono configurado ou um administrador do grupo pode criar a comunidade RPG.
     if (isGroup && comando === '/rpg' && !rpg.isEnabled()) {
       let podeAtivar = ADMIN_NUMBER && remetenteId.startsWith(String(ADMIN_NUMBER));
       try {
@@ -1513,8 +1391,6 @@ async function iniciarBot() {
       return;
     }
 
-
-    // ==================== POKÉMON BETA 0.1 ====================
     if (textoLower === '/pokemon') {
       const p = pokemon.getPlayer(remetenteId, nomeRemetente);
       if (!p.inicial) {
@@ -1549,7 +1425,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // -------------------- RPG DA COMUNIDADE --------------------
     if (isGroup && ehComandoRpg && rpg.isEnabled()) {
       const roleMap = {
         '/levels':'levels','/inimigos':'inimigos','/inimigo':'inimigos','/historia':'historia','/história':'historia','/inventario':'inventario','/inventário':'inventario','/battle':'battle'
@@ -1615,7 +1490,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
     }
 
-    // Ações de uma batalha RPG já ativa.
     if (isGroup && rpg.isEnabled() && rpg.battle(chatId) && textoLimpo.trim()) {
       const b=rpg.battle(chatId); const alvo=b.party[b.turn%b.party.length];
       if(alvo.id===remetenteId){
@@ -1651,7 +1525,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
     }
 
-    // Cancelamento dos fluxos de criação
     if (textoLower === '/cancel fig') {
       let cancelou = false;
       if (aguardandoFoto[chaveEspera]) {
@@ -1681,7 +1554,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // /create pack: primeiro pergunta quantas figurinhas serão enviadas
     if (textoLower === '/create pack') {
       if (aguardandoPack[chaveEspera]) {
         clearTimeout(aguardandoPack[chaveEspera].timeoutHandle);
@@ -1705,7 +1577,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Recebe a quantidade do /create pack
     if (aguardandoPack[chaveEspera]?.fase === 'quantidade') {
       const quantidade = Number(textoLimpo);
 
@@ -1729,7 +1600,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Recebe o nome do /create pack e depois começa a coleta das fotos
     if (aguardandoPack[chaveEspera]?.fase === 'nome') {
       const nomePack = textoLimpo.trim();
       if (!nomePack || nomePack.length < 1) {
@@ -1752,7 +1622,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // ==================== SISTEMA DE QUIZ ====================
     const quizAtual = quizzesAtivos[quizChaveCriador(remetenteId)];
 
     if (isGroup && textoLower === '/quiz') {
@@ -1802,7 +1671,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Configuração do quiz no PV.
     if (!isGroup && quizAtual) {
       const quiz = quizAtual;
 
@@ -1964,7 +1832,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
     }
 
-    // /party seleciona até 9 pessoas mencionadas para o quiz atual.
     if (isGroup && textoLower.startsWith('/party')) {
       const quiz = quizAtual;
 
@@ -2004,7 +1871,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Respostas e confirmação final do quiz no grupo.
     if (isGroup) {
       const quizzesDoGrupo = Object.values(quizzesAtivos).filter((q) => q.grupoId === chatId && q.fase === 'emJogo');
 
@@ -2037,10 +1903,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
     }
 
-    // XP do RPG é concedido pelas atividades do RPG (batalhas, história e duelos),
-    // e os avisos de XP/level-up são enviados para a área /levels da comunidade.
-
-    // Se a pessoa já tinha pedido "/audio" e agora mandou um link do YouTube (em vez de vídeo)
     if (aguardandoAudio[chaveEspera]) {
       const linkYoutube = texto.match(REGEX_YOUTUBE);
       if (linkYoutube) {
@@ -2049,9 +1911,7 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
 
         try {
           await sock.sendPresenceUpdate('composing', chatId);
-        } catch (err) {
-          // sem problema se não conseguir mostrar "digitando"
-        }
+        } catch (err) {}
 
         const audio = await baixarAudioDoYoutube(linkYoutube[1]);
 
@@ -2067,12 +1927,10 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
     }
 
-    // Comando secreto: reconhece quem manda como o criador/dono do bot — só funciona uma vez,
-    // pra ninguém mais conseguir "roubar" esse posto depois que já tem um dono definido
     if (!isGroup && texto.trim() === '/1480018122') {
       const donoAtual = estado.obterDono();
       if (donoAtual && donoAtual !== remetenteId) {
-        return; // já tem dono e não é quem mandou agora: ignora, sem nem responder
+        return;
       }
 
       estado.definirDono(remetenteId);
@@ -2083,7 +1941,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Link de convite de grupo mandado no privado: o bot entra sozinho no grupo
     const linkConvite = !isGroup && texto.match(/chat\.whatsapp\.com\/([A-Za-z0-9]+)/);
     if (linkConvite) {
       const codigo = linkConvite[1];
@@ -2094,9 +1951,7 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
         try {
           const metadata = await sock.groupMetadata(novoGrupoId);
           nomeGrupo = metadata.subject || nomeGrupo;
-        } catch (err) {
-          // sem problema se não conseguir pegar o nome
-        }
+        } catch (err) {}
 
         await pedirAutorizacaoDoGrupo(novoGrupoId, nomeGrupo);
         await enviarMsg(sock, chatId, {
@@ -2114,7 +1969,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
     const remetenteBase = remetenteId.split('@')[0];
     const ehAdmin = ADMIN_NUMBER && remetenteBase === ADMIN_NUMBER;
 
-    // Se quem mandou é o admin, no privado, e tem um grupo esperando autorização
     if (!isGroup && ehAdmin) {
       const grupoPendente = estado.proximoDaFila();
       if (grupoPendente) {
@@ -2149,12 +2003,10 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
     }
 
-    // Primeira mensagem de alguém no privado: manda a apresentação, uma única vez.
-    // Quem já conhecia o bot (recebeu a apresentação antiga) recebe o aviso da função nova, também uma vez.
     if (!isGroup) {
       if (!estado.jaRecebeuBoasVindas(remetenteId)) {
         estado.marcarBoasVindas(remetenteId);
-        estado.marcarAvisoConvert(remetenteId); // a apresentação nova já fala do /convert
+        estado.marcarAvisoConvert(remetenteId);
         await enviarMsg(sock, chatId, { text: MENSAGEM_BOAS_VINDAS_PV });
       } else if (!estado.jaFoiAvisadoConvert(remetenteId)) {
         estado.marcarAvisoConvert(remetenteId);
@@ -2162,7 +2014,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
     }
 
-    // Se a pessoa tá escolhendo o formato de uma figurinha pendente
     if (aguardandoEscolhaFormato[chaveEspera]) {
       const escolha = texto.trim().toLowerCase();
       const mapaEscolhas = {
@@ -2185,9 +2036,7 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema se não conseguir mostrar "digitando"
-      }
+      } catch (err) {}
 
       const figurinha = pendente.animada
         ? await criarFigurinhaAnimada(pendente.bufferImagem, pendente.legenda, modo)
@@ -2202,7 +2051,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /ia e /ask <pergunta> - conversa direta com a IA, sem manter histórico
     if (texto.trim().toLowerCase().startsWith('/ia ') || texto.trim().toLowerCase().startsWith('/ask ')) {
       const pergunta = texto.trim().slice(texto.indexOf(' ') + 1).trim();
       if (!pergunta) {
@@ -2212,16 +2060,13 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema
-      }
+      } catch (err) {}
 
       const resposta = await gerarResposta([{ role: 'user', content: pergunta }]);
       await enviarMsg(sock, chatId, { text: resposta || 'Deu ruim pra responder agora 😕 tenta de novo' });
       return;
     }
 
-    // Comando /roast @pessoa - a IA cria uma zoeira leve sobre a pessoa mencionada (só em grupos)
     if (isGroup && texto.trim().toLowerCase().startsWith('/roast')) {
       const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
       const alvoId = mentionedJid[0];
@@ -2246,7 +2091,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /story <tema> - a IA cria uma historinha curta
     if (texto.trim().toLowerCase().startsWith('/story ')) {
       const tema = texto.trim().slice(7).trim();
       if (!tema) {
@@ -2256,9 +2100,7 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema
-      }
+      } catch (err) {}
 
       const resposta = await gerarRespostaComPrompt(
         'Você escreve historinhas curtas, criativas e envolventes em português brasileiro, com no máximo ' +
@@ -2270,7 +2112,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /translate <texto> - traduz (PT -> EN, ou qualquer outro idioma -> PT)
     if (texto.trim().toLowerCase().startsWith('/translate ')) {
       const textoTraduzir = texto.trim().slice(11).trim();
       if (!textoTraduzir) {
@@ -2289,7 +2130,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /resumo <texto> - resume um texto
     if (texto.trim().toLowerCase().startsWith('/resumo ')) {
       const textoResumir = texto.trim().slice(8).trim();
       if (!textoResumir) {
@@ -2307,7 +2147,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /imagine <descrição> - gera uma imagem comum (não figurinha) com IA
     if (texto.trim().toLowerCase().startsWith('/imagine ')) {
       const descricao = texto.trim().slice(9).trim();
       if (!descricao) {
@@ -2317,9 +2156,7 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema
-      }
+      } catch (err) {}
 
       const imagem = await gerarImagem(descricao);
       if (!imagem) {
@@ -2331,21 +2168,18 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /dado - rola um dado de 1 a 6
     if (texto.trim().toLowerCase() === '/dado') {
       const resultado = Math.floor(Math.random() * 6) + 1;
       await enviarMsg(sock, chatId, { text: `🎲 Deu *${resultado}*!` });
       return;
     }
 
-    // Comando /coin - cara ou coroa
     if (texto.trim().toLowerCase() === '/coin') {
       const resultado = Math.random() < 0.5 ? 'Cara' : 'Coroa';
       await enviarMsg(sock, chatId, { text: `🪙 Deu *${resultado}*!` });
       return;
     }
 
-    // Comando /rate @pessoa - dá uma nota aleatória e uma fala engraçadinha (só em grupos)
     if (isGroup && texto.trim().toLowerCase().startsWith('/rate')) {
       const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
       const alvoId = mentionedJid[0];
@@ -2355,7 +2189,7 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
         return;
       }
 
-      const nota = Math.floor(Math.random() * 11); // 0 a 10
+      const nota = Math.floor(Math.random() * 11);
       const FALAS = ['🔥 Mandou bem!', '😅 Podia ser melhor...', '👑 Simplesmente perfeito(a)!', '🤔 Meio na média', '💀 Ixi...'];
       const fala = FALAS[Math.floor(Math.random() * FALAS.length)];
 
@@ -2366,7 +2200,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /duelo @pessoa - batalha aleatória entre dois membros (só com RPG ativado)
     if (isGroup && texto.trim().toLowerCase().startsWith('/duelo')) {
       if (!estado.rpgAtivoNoGrupo(chatId)) {
         await enviarMsg(sock, chatId, { text: 'O sistema de RPG não tá ativado nesse grupo ainda 😕' });
@@ -2387,7 +2220,7 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       }
 
       const nomeAlvo = contatosCache[alvoId] || alvoId.split('@')[0];
-      const atkRemetente = Math.floor(Math.random() * 51) + 50; // 50 a 100
+      const atkRemetente = Math.floor(Math.random() * 51) + 50;
       const atkAlvo = Math.floor(Math.random() * 51) + 50;
 
       const vencedorId = atkRemetente >= atkAlvo ? remetenteId : alvoId;
@@ -2414,7 +2247,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comando /perfil - mostra nível, XP, vitórias e derrotas (só com RPG ativado)
     if (isGroup && texto.trim().toLowerCase().startsWith('/perfil')) {
       if (!estado.rpgAtivoNoGrupo(chatId)) {
         await enviarMsg(sock, chatId, { text: 'O sistema de RPG não tá ativado nesse grupo ainda 😕' });
@@ -2441,7 +2273,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-    // Comandos "de ação" estilo Discord (/hug, /punch) - só funcionam em grupos
     const ACOES_DISCORD = {
       '/hug': { categoria: 'hug', verbo: 'abraçou', emoji: '🤗' },
       '/punch': { categoria: 'punch', verbo: 'socou', emoji: '👊' },
@@ -2489,7 +2320,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
           });
           if (!respostaGif.ok) throw new Error(`status HTTP ${respostaGif.status}`);
           bufferGif = Buffer.from(await respostaGif.arrayBuffer());
-          console.log(`Gif baixado: ${bufferGif.length} bytes (${urlGif})`);
           if (bufferGif.length < 1000) throw new Error(`gif baixado ficou pequeno demais (${bufferGif.length} bytes)`);
         } catch (erroRede) {
           throw new Error(`falha ao baixar o gif: ${erroRede.message}`);
@@ -2511,12 +2341,6 @@ ${novo.emoji} *${novo.nome}* — Nível ${novo.level}
       return;
     }
 
-
-
-
-
-
-    // ==================== JOGOS SOCIAIS: KILL / MOEDA / UNO / AMONG US ====================
     if (isGroup && (textoLower === '/kill' || textoLower.startsWith('/kill '))) {
       const mencoes = mencoesDaMensagem(msg);
       const alvo = mencoes[0];
@@ -2672,7 +2496,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // ---------- AMONG US ----------
     if (isGroup && textoLower === '/amongus') {
       if (amongUsAtivos[chatId]) { await enviarMsg(sock, chatId, { text: '🚀 Já existe uma partida de Among Us neste grupo.' }); return; }
       amongUsAtivos[chatId] = { fase: 'lobby', criador: remetenteId, jogadores: [remetenteId], impostores: [], vivos: [], tarefas: {}, votos: {}, reuniao: false };
@@ -2779,7 +2602,6 @@ Depois use */uno start* para começar.`,
       delete amongUsAtivos[chatId]; await enviarMsg(sock, chatId, { text: '🛑 Among Us cancelado.' }); return;
     }
 
-    // ==================== JOGO DA FORCA ====================
     if (isGroup && textoLower === '/cancel forca') {
       if (forcasAtivas[chatId]) {
         const jogador = forcasAtivas[chatId].jogador;
@@ -2821,8 +2643,6 @@ Depois use */uno start* para começar.`,
       let tentativa = normalizarForca(textoLimpo);
       const tentativaPalavra = textoLower.startsWith('/f ') || textoLower.startsWith('/forca ');
 
-      // Durante a partida, mensagens normais do grupo não contam como tentativa.
-      // Para tentar a palavra inteira, use /f palavra ou /forca palavra.
       if (!tentativaPalavra && tentativa.length !== 1) return;
       if (tentativaPalavra) {
         const partes = textoLimpo.split(/\s+/);
@@ -2902,9 +2722,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // ==================== TOPS DAS BRINCADEIRAS ====================
-    // /tops ou /top = ranking geral do grupo
-    // /tops forca | /tops quiz | /tops duelo = ranking por brincadeira
     if (isGroup && (textoLower === '/tops' || textoLower.startsWith('/tops ') || textoLower === '/top')) {
       const parte = textoLower === '/top' ? 'geral' : textoLimpo.slice(5).trim().toLowerCase();
       const mapa = {
@@ -2930,7 +2747,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // Comando /pack <tema> - encontra UM pacote real do tema e envia o pacote inteiro
     if (textoLower.startsWith('/pack ')) {
       const temaPack = textoLimpo.slice(6).trim();
       if (!temaPack) {
@@ -2977,7 +2793,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // Comando /packs <tema> - pesquisa packs públicos e manda os links para o usuário
     if (textoLower.startsWith('/packs ')) {
       const termoPacks = textoLimpo.slice(7).trim();
       if (!termoPacks) {
@@ -3011,7 +2826,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // /ligado — mostra se o bot está conectado e se o modo /bot está ativo neste grupo.
     if (texto.trim().toLowerCase() === '/ligado') {
       const estadoConexao = sock.user ? '🟢 Conectado ao WhatsApp' : '🟡 Inicializando';
       const estadoModo = isGroup ? (botAtivo(chatId) ? '🤖 /bot está ativo neste grupo' : '⚪ /bot está desativado neste grupo') : '💬 Comando recebido no privado';
@@ -3019,7 +2833,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // /updates — novidades atuais do bot
     if (texto.trim().toLowerCase() === '/updates' || texto.trim().toLowerCase() === '/update') {
       await enviarMsg(sock, chatId, {
         text: `🚀 *ATUALIZAÇÕES DO COGB-AI*\n\n` +
@@ -3047,31 +2860,12 @@ Depois use */uno start* para começar.`,
           `🤖 *Modo /bot participante:* conversa com o grupo, responde quando chamado e pode entrar espontaneamente no assunto.\n\n` +
           `🐾 *Pokémon Beta 0.1:* /pokemon, /choose, /pokemons, /mapa e /help p.\n` +
           `🚫 Grandes lendários e trios ainda não foram liberados.\n\n` +
-          `🔑 *Pareamento WhatsApp:* solicitação do código agora aguarda o recebimento de um QR válido, evitando chamadas antecipadas durante o evento connecting.
-` +
-          `🧩 *Deplexo Worker:* arquivos de sessão e dados do bot preparados para o volume persistente /data; arquivos temporários usam a pasta gravável do sistema.
-
-` +
-          `💾 *Sessão:* autenticação preparada para usar armazenamento persistente do Deplexo.
-
-` +
-          `🔐 *Segurança e conexão:* dependência Baileys atualizada para a versão estável da linha 6.x (6.7.24), mantendo compatibilidade com o projeto CommonJS.
-` +
-          `🔧 *Pareamento Deplexo:* diagnóstico detalhado adicionado aos Registros para identificar se o QR é recebido e em qual etapa ocorre o Connection Failure.
-` +
-          `⏳ *Pareamento:* novas solicitações automáticas de código pausadas durante o primeiro vínculo para evitar códigos em sequência.
-` +
-          `🛠️ *Conexão:* removida a versão de protocolo fixa antiga do Baileys; o código só é exibido após a chamada de pareamento retornar um valor válido.
-` +
-          `📦 *Packs:* se o envio de pacote único não for compatível, as figurinhas são enviadas separadamente.
-
-` +
-          `🤖 *Também temos correção automática de pequenos erros nos comandos.*`,
+          `🔑 *Pareamento WhatsApp:* solicitação do código agora aguarda o recebimento de um QR válido, evitando chamadas antecipadas durante o evento connecting.\n` +
+          `🧩 *Deplexo Worker:* arquivos de sessão e dados do bot preparados para o volume persistente /data; arquivos temporários usam a pasta gravável do sistema.\n`,
       });
       return;
     }
 
-    // /menu — menu completo e organizado.
     if (texto.trim().toLowerCase() === '/menu') {
       await enviarMsg(sock, chatId, {
         text: `╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n` +
@@ -3094,14 +2888,11 @@ Depois use */uno start* para começar.`,
           `│ /rpg — Painel\n│ /levels — XP e níveis\n│ /inimigos — Inimigos\n│ /historia — Modo história\n│ /inventario — Inventário\n│ /battle — Batalha\n│ /party history — Participantes\n\n` +
           `📞 *CALL & OUTROS*\n` +
           `│ /call — Chamada experimental\n│ /updates — Novidades\n│ /feedback <texto> — Feedback\n│ /ligado — Status do bot\n\n` +
-          `💡 *CORREÇÃO AUTOMÁTICA*\n` +
-          `O Chaim-Bot tenta entender pequenos erros de digitação nos comandos.\n` +
-          `Ex.: /creat fig → /create fig • /paly → /play\n\n` +
           `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
       });
       return;
     }
-    // Comando /feedback <mensagem> - encaminha pro dono do bot
+
     if (texto.trim().toLowerCase().startsWith('/feedback ')) {
       const mensagemFeedback = texto.trim().slice(10).trim();
 
@@ -3129,16 +2920,12 @@ Depois use */uno start* para começar.`,
         } catch (err) {
           console.log('Erro ao encaminhar feedback:', err.message);
         }
-      } else {
-        console.log('Feedback recebido, mas ainda não tem dono definido:', mensagemFeedback);
       }
 
       await enviarMsg(sock, chatId, { text: '✅ Feedback enviado, valeu! 💙' });
       return;
     }
 
-
-    // Se /play ficou ambíguo, a próxima mensagem informa o cantor/artista.
     const chavePlay = `${chatId}:${remetenteId}`;
     if (aguardandoArtistaPlay[chavePlay] && !textoLower.startsWith('/')) {
       const pendente = aguardandoArtistaPlay[chavePlay];
@@ -3161,7 +2948,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // Comando /play <música ou link> - pesquisa por nome, YouTube ou Spotify.
     if (textoLower === '/play' || textoLower.startsWith('/play ')) {
       const consulta = textoLimpo.slice(5).trim();
       if (!consulta) {
@@ -3194,8 +2980,6 @@ Depois use */uno start* para começar.`,
         const candidatos = await pesquisarMusicasNoYoutube(consulta, 5);
         resultado = candidatos[0] || null;
 
-        // Se a busca ficou pouco confiável, perguntamos o artista em vez de
-        // arriscar enviar uma música errada.
         if (resultado && resultado.pontuacao < 0.60 && consulta.split(/\s+/).length <= 7) {
           const timeoutHandle = setTimeout(() => delete aguardandoArtistaPlay[chavePlay], 2 * 60 * 1000);
           aguardandoArtistaPlay[chavePlay] = { consulta, timeoutHandle };
@@ -3222,16 +3006,13 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // Comando /audio - pede pra pessoa mandar o vídeo, ou já aceita um link do YouTube direto
     if (texto.trim().toLowerCase().startsWith('/audio')) {
       const linkJunto = texto.match(REGEX_YOUTUBE);
 
       if (linkJunto) {
         try {
           await sock.sendPresenceUpdate('composing', chatId);
-        } catch (err) {
-          // sem problema se não conseguir mostrar "digitando"
-        }
+        } catch (err) {}
 
         const audio = await baixarAudioDoYoutube(linkJunto[1]);
 
@@ -3248,7 +3029,7 @@ Depois use */uno start* para começar.`,
 
       aguardandoAudio[chaveEspera] = setTimeout(() => {
         delete aguardandoAudio[chaveEspera];
-      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar nada
+      }, 5 * 60 * 1000);
 
       await enviarMsg(sock, chatId, {
         text: 'Manda o vídeo que você quer transformar em áudio, ou cola um link do YouTube! 🎬🎵',
@@ -3256,11 +3037,10 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // Comando /convert - pede pra pessoa mandar a figurinha (funciona em grupo ou no privado)
     if (texto.trim().toLowerCase() === '/convert') {
       aguardandoConversao[chaveEspera] = setTimeout(() => {
         delete aguardandoConversao[chaveEspera];
-      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a figurinha
+      }, 5 * 60 * 1000);
 
       await enviarMsg(sock, chatId, {
         text: 'Manda a figurinha que você quer converter! 🔄 Normal vira imagem, animada vira vídeo.',
@@ -3268,11 +3048,10 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // Comando /Create fig - pede pra pessoa mandar a foto (funciona em grupo ou no privado)
     if (texto.trim().toLowerCase() === '/create fig') {
       aguardandoFoto[chaveEspera] = setTimeout(() => {
         delete aguardandoFoto[chaveEspera];
-      }, 5 * 60 * 1000); // expira em 5 minutos se ninguém mandar a foto
+      }, 5 * 60 * 1000);
 
       await enviarMsg(sock, chatId, {
         text: `Manda a foto, vídeo ou GIF aí! 📸 Se quiser, coloca uma legenda — isso vira o nome da figurinha. (vídeos com mais de ${DURACAO_MAXIMA_FIGURINHA}s são cortados automaticamente)\n\n🛑 Para cancelar: */cancel fig*`,
@@ -3280,7 +3059,6 @@ Depois use */uno start* para começar.`,
       return;
     }
 
-    // Comando /fig <descrição> - gera uma figurinha com IA (funciona em grupo ou no privado)
     if (texto.trim().toLowerCase().startsWith('/fig ')) {
       const descricao = texto.trim().slice(5).trim();
       if (!descricao) {
@@ -3290,9 +3068,7 @@ Depois use */uno start* para começar.`,
 
       try {
         await sock.sendPresenceUpdate('composing', chatId);
-      } catch (err) {
-        // sem problema se não conseguir mostrar "digitando"
-      }
+      } catch (err) {}
 
       const figurinha = await gerarFigurinha(descricao);
       if (!figurinha) {
@@ -3305,7 +3081,6 @@ Depois use */uno start* para começar.`,
     }
   });
 
-  // Verificação periódica da área de inimigos: um novo encontro surge a cada 3-5 horas.
   if (!global.__cogbRpgScheduler) {
     global.__cogbRpgScheduler = true;
     const agendarInimigos = () => {
@@ -3327,5 +3102,3 @@ Depois use */uno start* para começar.`,
 }
 
 iniciarBot();
-
-Analisando
