@@ -1,27 +1,31 @@
 require('dotenv').config();
-process.on('uncaughtException', (err) => console.error('Erro nao tratado:', err.message));
-process.on('unhandledRejection', (err) => console.error('Rejeicao nao tratada:', err?.message || err));
 
+console.log("=== ETAPA 1: Carregando variaveis de ambiente ===");
+console.log("ADMIN_NUMBER configurado:", process.env.ADMIN_NUMBER ? "Sim" : "Nao");
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ ERRO FATAL (uncaughtException):', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ REJEICAO NAO TRATADA:', reason);
+});
+
+console.log("=== ETAPA 2: Carregando modulos internos ===");
 const fs = require('fs');
 const path = require('path');
-const pino = require('pino');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
-const {
-  default: makeWASocket,
-  Browsers,
-  fetchLatestBaileysVersion,
-  useMultiFileAuthState,
-  DisconnectReason,
-} = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
-const { gerarResposta, gerarRespostaComPrompt } = require('./chatbot');
-let stickerLib = {};
+
 try {
-  stickerLib = require('./sticker');
+  const chatbot = require('./chatbot');
+  console.log("Módulo chatbot carregado com sucesso.");
 } catch (e) {
-  console.log('Modulo sticker.js nao encontrado; funcoes de figurinha desativadas.');
+  console.error("Erro ao carregar chatbot.js:", e.message);
 }
 
-console.log("Iniciando Chaim-Bot na Deplexo...");
+try {
+  const sticker = require('./sticker');
+  console.log("Módulo sticker carregado com sucesso.");
+} catch (e) {
+  console.error("Erro ao carregar sticker.js:", e.message);
+}
+
+console.log("=== ETAPA 3: Fim dos testes de arranque ===");
