@@ -14,7 +14,6 @@ const {
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
   DisconnectReason,
-  downloadMediaMessage,
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const { gerarResposta, gerarRespostaComPrompt } = require('./chatbot');
@@ -60,5 +59,4 @@ function ehCriador(remetenteId) {
   return donoSalvo ? numeroBaseJid(remetenteId) === numeroBaseJid(donoSalvo) : numeroBaseJid(remetenteId) === NUMERO_CRIADOR;
 }
 
-console.log("Iniciando Chaim-Bot...");
-Analisando
+console.log("Iniciando Chaim-Bot com sucesso...");
