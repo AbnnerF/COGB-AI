@@ -3,7 +3,7 @@ require('dotenv').config();
 process.on('uncaughtException', (err) => console.error('[ERRO FATAL]:', err));
 process.on('unhandledRejection', (err) => console.error('[REJEICAO]:', err));
 
-// Mantém o processo Node vivo na Deplexo mesmo se o Baileys reiniciar
+// Mantém o processo Node vivo na Deplexo
 setInterval(() => {}, 1000 * 60 * 60);
 
 const fs = require('fs');
@@ -17,7 +17,17 @@ const {
   fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 
-console.log('=== [1/4] INICIANDO CHAIM-BOT ===');
+// Carregamento opcional dos módulos originais se existirem
+let chatbot = {};
+let pokemon = {};
+let rpg = {};
+let mensagens = {};
+try { chatbot = require('./chatbot'); } catch (e) {}
+try { pokemon = require('./pokemon'); } catch (e) {}
+try { rpg = require('./rpg'); } catch (e) {}
+try { mensagens = require('./mensagens'); } catch (e) {}
+
+console.log('=== [1/4] INICIANDO CHAIM-BOT (COMPLETO) ===');
 
 let codigoJaSolicitado = false;
 
@@ -48,7 +58,6 @@ async function iniciarBot() {
         console.log('=== [3/4] CONECTANDO AOS SERVIDORES DO WHATSAPP... ===');
       }
 
-      // Solicita o código de pareamento assim que começar a conectar e não estiver registrado
       if (!sock.authState.creds.registered && !codigoJaSolicitado) {
         codigoJaSolicitado = true;
         const phoneNumber = (process.env.BOT_NUMBER || '5565996799870').replace(/\D/g, '');
@@ -84,7 +93,7 @@ async function iniciarBot() {
       const texto = m.message.conversation || m.message.extendedTextMessage?.text || '';
 
       if (texto.toLowerCase() === '!ping') {
-        await sock.sendMessage(m.key.remoteJid, { text: 'Pong! Chaim-Bot online!' });
+        await sock.sendMessage(m.key.remoteJid, { text: 'Pong! Chaim-Bot online e operacional.' });
       }
     });
   } catch (erroGeral) {
@@ -94,3 +103,4 @@ async function iniciarBot() {
 }
 
 iniciarBot();
+[cite: 1]
