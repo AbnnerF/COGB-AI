@@ -1,30 +1,4 @@
-require('dotenv').config();
-process.on('uncaughtException', (err) => console.error('Erro nao tratado:', err.message));
-process.on('unhandledRejection', (err) => console.error('Rejeicao nao tratada:', err?.message || err));
-
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const pino = require('pino');
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-} = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
-const { gerarResposta } = require('./chatbot');
-
-let stickerLib = {};
-try {
-  stickerLib = require('./sticker');
-} catch (e) {
-  console.log('Modulo sticker.js nao carregado.');
-}
-
-console.log("Iniciando Chaim-Bot no modo completo...");
-
 async function iniciarBot() {
-  // Usa /data se existir na Deplexo, ou cai para a pasta temporaria /tmp com permissao garantida
   const baseDir = fs.existsSync('/data') ? '/data' : os.tmpdir();
   const pastaAuth = path.join(baseDir, 'auth_info_baileys');
   
@@ -35,18 +9,29 @@ async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState(pastaAuth);
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true,
+    printQRInTerminal: false, // Desativamos o QR code visual
     logger: pino({ level: 'silent' }),
   });
 
   sock.ev.on('creds.update', saveCreds);
 
+  // Se nao estiver pareado, gera o codigo de pareamento no terminal
+  if (!sock.authState.creds.registered) {
+    const phoneNumber = process.env.BOT_NUMBER || "556599... (seu número com DDD)"; // Insira seu número aqui ou via variavel de ambiente
+    setTimeout(async () => {
+      try {
+        let code = await sock.requestPairingCode(phoneNumber.replace(/\D/g, ''));
+        console.log(`\n========================================`);
+        console.log(`👉 SEU CODIGO DE PAREAMENTO DO WHATSAPP: ${code}`);
+        console.log(`========================================\n`);
+      } catch (err) {
+        console.error("Erro ao gerar codigo de pareamento:", err.message);
+      }
+    }, 4000);
+  }
+
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
-    if (qr) {
-      console.log('Escaneie o QR Code abaixo para conectar:');
-      qrcode.generate(qr, { small: true });
-    }
+    const { connection, lastDisconnect } = update;
     if (connection === 'close') {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       console.log('Conexao fechada. Reconectando...', shouldReconnect);
@@ -66,5 +51,3 @@ async function iniciarBot() {
     }
   });
 }
-
-iniciarBot();
