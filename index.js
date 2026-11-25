@@ -1,3 +1,27 @@
+require('dotenv').config();
+process.on('uncaughtException', (err) => console.error('Erro nao tratado:', err.message));
+process.on('unhandledRejection', (err) => console.error('Rejeicao nao tratada:', err?.message || err));
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const pino = require('pino');
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+} = require('@whiskeysockets/baileys');
+const { gerarResposta } = require('./chatbot');
+
+let stickerLib = {};
+try {
+  stickerLib = require('./sticker');
+} catch (e) {
+  console.log('Modulo sticker.js nao carregado.');
+}
+
+console.log("Iniciando Chaim-Bot na Deplexo...");
+
 async function iniciarBot() {
   const baseDir = fs.existsSync('/data') ? '/data' : os.tmpdir();
   const pastaAuth = path.join(baseDir, 'auth_info_baileys');
@@ -9,25 +33,29 @@ async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState(pastaAuth);
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: false, // Desativamos o QR code visual
+    printQRInTerminal: false, // Desativado pois estamos na Deplexo
     logger: pino({ level: 'silent' }),
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // Se nao estiver pareado, gera o codigo de pareamento no terminal
+  // Se o bot ainda nao estiver registado, solicita o codigo de pareamento
   if (!sock.authState.creds.registered) {
-    const phoneNumber = process.env.BOT_NUMBER || "556599... (seu número com DDD)"; // Insira seu número aqui ou via variavel de ambiente
+    // Insira aqui o seu número de WhatsApp com o DDD (ex: 5565999999999) 
+    // ou configure a variavel de ambiente BOT_NUMBER no painel da Deplexo
+    const phoneNumber = process.env.BOT_NUMBER || "5565996799870"; 
+    
     setTimeout(async () => {
       try {
+        console.log(`Solicitando codigo de pareamento para o numero: ${phoneNumber}...`);
         let code = await sock.requestPairingCode(phoneNumber.replace(/\D/g, ''));
         console.log(`\n========================================`);
-        console.log(`👉 SEU CODIGO DE PAREAMENTO DO WHATSAPP: ${code}`);
+        console.log(`👉 SEU CODIGO DE PAREAMENTO: ${code}`);
         console.log(`========================================\n`);
       } catch (err) {
         console.error("Erro ao gerar codigo de pareamento:", err.message);
       }
-    }, 4000);
+    }, 5000);
   }
 
   sock.ev.on('connection.update', (update) => {
@@ -51,3 +79,5 @@ async function iniciarBot() {
     }
   });
 }
+
+iniciarBot();
