@@ -66,7 +66,7 @@ const img = new webp.Image();
 const dados = {
 'sticker-pack-id': Date.now().toString(),
 'sticker-pack-name': nomeFigurinha || 'Figurinha',
-'sticker-pack-publisher': 'Bot',
+'sticker-pack-publisher': 'Chaim-Bot',
 emojis: ['🙂'],
 };
 const exifAttr = Buffer.from([
@@ -131,73 +131,6 @@ return null;
 } finally {
 if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
 if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
-}
-}
-
-async function converterFigurinhaParaImagem(bufferWebp) {
-garantirPastaTemp();
-const nomeArquivo = ${Date.now()}-${Math.floor(Math.random() * 10000)};
-const caminhoEntrada = path.join(PASTA_TEMP, ${nomeArquivo}.webp);
-const caminhoSaida = path.join(PASTA_TEMP, ${nomeArquivo}.png);
-
-try {
-fs.writeFileSync(caminhoEntrada, bufferWebp);
-try {
-await execAsync(dwebp "${caminhoEntrada}" -o "${caminhoSaida}");
-} catch (erroDwebp) {
-const primeiroFrame = path.join(PASTA_TEMP, ${nomeArquivo}-frame.webp);
-try {
-await execAsync(webpmux -get frame 1 "${caminhoEntrada}" -o "${primeiroFrame}");
-await execAsync(dwebp "${primeiroFrame}" -o "${caminhoSaida}");
-} finally {
-if (fs.existsSync(primeiroFrame)) fs.unlinkSync(primeiroFrame);
-}
-}
-return fs.readFileSync(caminhoSaida);
-} catch (err) {
-return null;
-} finally {
-if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
-if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
-}
-}
-
-async function converterFigurinhaParaVideo(bufferWebp) {
-garantirPastaTemp();
-const idPasta = ${Date.now()}-${Math.floor(Math.random() * 10000)};
-const pastaFrames = path.join(PASTA_TEMP, frames-${idPasta});
-const caminhoEntrada = path.join(PASTA_TEMP, ${idPasta}.webp);
-const caminhoSaida = path.join(PASTA_TEMP, ${idPasta}.mp4);
-
-try {
-fs.mkdirSync(pastaFrames, { recursive: true });
-fs.writeFileSync(caminhoEntrada, bufferWebp);
-
-const { stdout: info } = await execAsync(`webpmux -info "${caminhoEntrada}"`);
-const match = info.match(/Number of frames:\s*(\d+)/i);
-const totalQuadros = match ? parseInt(match[1], 10) : 0;
-if (!totalQuadros) return null;
-
-for (let i = 1; i <= totalQuadros; i++) {
-  const quadroWebp = path.join(pastaFrames, `q${i}.webp`);
-  const quadroPng = path.join(pastaFrames, `q${String(i).padStart(4, '0')}.png`);
-  await execAsync(`webpmux -get frame ${i} "${caminhoEntrada}" -o "${quadroWebp}"`);
-  await execAsync(`dwebp "${quadroWebp}" -o "${quadroPng}"`);
-}
-
-await execAsync(
-  `ffmpeg -y -framerate 15 -i "${pastaFrames}/q%04d.png" -movflags faststart -pix_fmt yuv420p ` +
-    `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${caminhoSaida}"`
-);
-return fs.readFileSync(caminhoSaida);
-
-
-} catch (err) {
-return null;
-} finally {
-if (fs.existsSync(caminhoEntrada)) fs.unlinkSync(caminhoEntrada);
-if (fs.existsSync(caminhoSaida)) fs.unlinkSync(caminhoSaida);
-if (fs.existsSync(pastaFrames)) fs.rmSync(pastaFrames, { recursive: true, force: true });
 }
 }
 
@@ -302,13 +235,11 @@ module.exports = {
 gerarFigurinha,
 criarFigurinhaDeImagem,
 criarFigurinhaAnimada,
-converterFigurinhaParaImagem,
-converterFigurinhaParaVideo,
-converterVideoParaAudio,
 baixarAudioDoYoutube,
 pesquisarPacksStickerLy,
 buscarPackCompletoPorTema,
 adicionarMetadados,
+obterDimensoes,
 ehDesproporcional,
 DURACAO_MAXIMA_FIGURINHA,
 };
