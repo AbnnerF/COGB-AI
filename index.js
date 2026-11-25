@@ -17,12 +17,13 @@ let stickerLib = {};
 try {
   stickerLib = require('./sticker');
 } catch (e) {
-  console.log('Modulo sticker.js nao carregado.');
+  console.log('Modulo sticker.js carregado com avisos.');
 }
 
-console.log("Iniciando Chaim-Bot na Deplexo...");
+console.log("Iniciando Chaim-Bot na Deplexo (Modo Completo Seguro)...");
 
 async function iniciarBot() {
+  // Pasta temporaria segura na Deplexo para evitar erros de escrita (ENOENT)
   const baseDir = fs.existsSync('/data') ? '/data' : os.tmpdir();
   const pastaAuth = path.join(baseDir, 'auth_info_baileys');
   
@@ -33,18 +34,15 @@ async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState(pastaAuth);
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: false, // Desativado pois estamos na Deplexo
+    printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // Se o bot ainda nao estiver registado, solicita o codigo de pareamento
+  // Gera o código de pareamento automaticamente se o bot não estiver conectado
   if (!sock.authState.creds.registered) {
-    // Insira aqui o seu número de WhatsApp com o DDD (ex: 5565999999999) 
-    // ou configure a variavel de ambiente BOT_NUMBER no painel da Deplexo
-    const phoneNumber = process.env.BOT_NUMBER || "5565996799870"; 
-    
+    const phoneNumber = process.env.BOT_NUMBER || "5565996799870"; // Altere para o número do seu bot
     setTimeout(async () => {
       try {
         console.log(`Solicitando codigo de pareamento para o numero: ${phoneNumber}...`);
@@ -74,8 +72,9 @@ async function iniciarBot() {
     if (!m.message || m.key.fromMe) return;
     const texto = m.message.conversation || m.message.extendedTextMessage?.text || '';
     
+    // Comando basico de teste
     if (texto.toLowerCase() === '!ping') {
-      await sock.sendMessage(m.key.remoteJid, { text: 'Pong! Bot online e operacional.' });
+      await sock.sendMessage(m.key.remoteJid, { text: 'Pong! Chaim-Bot online e operacional.' });
     }
   });
 }
