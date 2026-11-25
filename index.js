@@ -4,6 +4,7 @@ process.on('unhandledRejection', (err) => console.error('Rejeicao nao tratada:',
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const pino = require('pino');
 const {
   default: makeWASocket,
@@ -23,7 +24,15 @@ try {
 console.log("Iniciando Chaim-Bot no modo completo...");
 
 async function iniciarBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+  // Usa /data se existir na Deplexo, ou cai para a pasta temporaria /tmp com permissao garantida
+  const baseDir = fs.existsSync('/data') ? '/data' : os.tmpdir();
+  const pastaAuth = path.join(baseDir, 'auth_info_baileys');
+  
+  if (!fs.existsSync(pastaAuth)) {
+    fs.mkdirSync(pastaAuth, { recursive: true });
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(pastaAuth);
   const sock = makeWASocket({
     auth: state,
     printQRInTerminal: true,
@@ -33,7 +42,11 @@ async function iniciarBot() {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) {
+      console.log('Escaneie o QR Code abaixo para conectar:');
+      qrcode.generate(qr, { small: true });
+    }
     if (connection === 'close') {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       console.log('Conexao fechada. Reconectando...', shouldReconnect);
