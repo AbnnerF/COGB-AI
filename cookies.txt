@@ -1,0 +1,3 @@
+# Netscape HTTP Cookie File
+.youtube.com	TRUE	/	TRUE	1828669270	LOGIN_INFO	AFmmF2swRAIgOff6Dyb9dV4JHezOXfy03IDtp7nbcGsh64YK9FtPTOoCIBcbUBWNRNTmcrwo6I2clSgAZcmYmxxdF_qsJP6vmDxz
+.youtube.com	TRUE	/	TRUE	1830135136	PREF	tz=America.Cuiaba&f5=20000&f7=100
