@@ -37,7 +37,7 @@ return chamarGroq([{ role: 'system', content: SYSTEM_BASE }, ...messages]);
 
 async function gerarRespostaComPrompt(prompt, mensagem) {
 return chamarGroq([
-{ role: 'system', content: ${SYSTEM_BASE}\n\nREGRAS ESPECÍFICAS:\n${prompt} },
+{ role: 'system', content: ${SYSTEM_BASE}\n\nREGRAS ESPECÍfICAS:\n${prompt} },
 { role: 'user', content: mensagem },
 ]);
 }
