@@ -1,7 +1,6 @@
 {
   "name": "cogb-ai",
   "version": "2.0.0",
-  "description": "Bot de WhatsApp Chaim-Bot / COGB-AI",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
