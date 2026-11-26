@@ -486,6 +486,7 @@ async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publ
   const capa = stickers[0].data;
 
   try {
+    // Tenta enviar pelo formato de pacote nativo do WhatsApp
     return await sock.sendMessage(chatId, {
       stickerPack: {
         name: String(nomePack || 'Meu Pack').slice(0, 100),
@@ -496,14 +497,28 @@ async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publ
       },
     });
   } catch (errNativo) {
-    const wastickers = await criarArquivoWastickers(figurinhas, nomePack, publisher);
-    if (!wastickers) throw errNativo;
-    return await sock.sendMessage(chatId, {
-      document: wastickers.buffer,
-      mimetype: 'application/octet-stream',
-      fileName: wastickers.fileName,
-      caption: `📦 *Pacote Único: ${nomePack}*\n🖼️ ${figurinhas.length} figurinha(s) dentro!\n\n👉 Toque no arquivo acima para adicionar o pacote inteiro de uma vez no WhatsApp.`,
-    });
+    console.log('Pacote nativo recusado, enviando figurinhas individualmente...');
+    
+    // Se falhar o nativo, envia todas as figurinhas direto no chat uma por uma!
+    let enviadas = 0;
+    for (const item of figurinhas) {
+      try {
+        await sock.sendMessage(chatId, { sticker: item.buffer || item });
+        enviadas++;
+        // Pequena pausa para evitar bloqueio ou flood no envio
+        await new Promise((r) => setTimeout(r, 600));
+      } catch (erroFigurinha) {
+        console.log('Erro ao enviar figurinha individual:', erroFigurinha.message);
+      }
+    }
+
+    if (enviadas > 0) {
+      await sock.sendMessage(chatId, { 
+        text: `📦 *Pack: ${nomePack}*\n✨ Enviei as ${enviadas} figurinhas diretamente aqui no chat para você!` 
+      });
+    } else {
+      throw errNativo;
+    }
   }
 }
 
