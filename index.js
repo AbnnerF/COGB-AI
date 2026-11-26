@@ -477,6 +477,7 @@ async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publ
     throw new Error('O pack não possui figurinhas.');
   }
 
+  // Prepara todas as figurinhas no formato exigido pelo Baileys para pacotes
   const stickers = figurinhas.map((item) => ({
     data: item.buffer || item,
     emojis: item.emojis || ['🙂'],
@@ -485,41 +486,16 @@ async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publ
 
   const capa = stickers[0].data;
 
-  try {
-    // Tenta enviar pelo formato de pacote nativo do WhatsApp
-    return await sock.sendMessage(chatId, {
-      stickerPack: {
-        name: String(nomePack || 'Meu Pack').slice(0, 100),
-        publisher: String(publisher || 'COGB-AI').slice(0, 100),
-        description: 'Pack criado pelo COGB-AI',
-        cover: capa,
-        stickers,
-      },
-    });
-  } catch (errNativo) {
-    console.log('Pacote nativo recusado, enviando figurinhas individualmente...');
-    
-    // Se falhar o nativo, envia todas as figurinhas direto no chat uma por uma!
-    let enviadas = 0;
-    for (const item of figurinhas) {
-      try {
-        await sock.sendMessage(chatId, { sticker: item.buffer || item });
-        enviadas++;
-        // Pequena pausa para evitar bloqueio ou flood no envio
-        await new Promise((r) => setTimeout(r, 600));
-      } catch (erroFigurinha) {
-        console.log('Erro ao enviar figurinha individual:', erroFigurinha.message);
-      }
-    }
-
-    if (enviadas > 0) {
-      await sock.sendMessage(chatId, { 
-        text: `📦 *Pack: ${nomePack}*\n✨ Enviei as ${enviadas} figurinhas diretamente aqui no chat para você!` 
-      });
-    } else {
-      throw errNativo;
-    }
-  }
+  // Envia diretamente como um pacote oficial do WhatsApp
+  return await sock.sendMessage(chatId, {
+    stickerPack: {
+      name: String(nomePack || 'Meu Pack').slice(0, 100),
+      publisher: String(publisher || 'COGB-AI').slice(0, 100),
+      description: 'Pack criado pelo Chaim-Bot',
+      cover: capa,
+      stickers,
+    },
+  });
 }
 
 function quizChaveCriador(criadorId) {
