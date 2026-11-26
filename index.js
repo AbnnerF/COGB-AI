@@ -5,6 +5,7 @@ setInterval(() => {}, 1000 * 60 * 60);
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const pino = require('pino');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
@@ -57,36 +58,15 @@ const {
 const estado = require('./estado');
 const { DATA_DIR, ensureDataDir } = require('./storage');
 const ARQUIVO_LOG = path.join(DATA_DIR, 'chaim-bot.log');
-try {
-  ensureDataDir();
-  for (const nivel of ['log', 'warn', 'error']) {
-    const original = console[nivel].bind(console);
-    console[nivel] = (...args) => {
-      original(...args);
-      try {
-        const linha = `[${new Date().toISOString()}] [${nivel.toUpperCase()}] ${args.map(v => typeof v === 'string' ? v : JSON.stringify(v)).join(' ')}\n`;
-        fs.appendFileSync(ARQUIVO_LOG, linha);
-        const stats = fs.statSync(ARQUIVO_LOG);
-        if (stats.size > 1024 * 1024) {
-          const linhas = fs.readFileSync(ARQUIVO_LOG, 'utf8').split(/\r?\n/).slice(-1500);
-          fs.writeFileSync(ARQUIVO_LOG, linhas.join('\n'));
-        }
-      } catch (_) {}
-    };
-  }
-} catch (_) {}
-const tops = require('./tops');
-const rpg = require('./rpg');
-const pokemon = require('./pokemon');
 
-const ADMIN_NUMBER = process.env.ADMIN_NUMBER;
+// FORÇANDO SEU NÚMERO COMO ADMIN E CRIADOR OFICIAL
+const ADMIN_NUMBER = '5565996799870';
+const NUMERO_CRIADOR = '5565996799870';
 const BOT_NUMBER = process.env.BOT_NUMBER;
 
-const NUMERO_CRIADOR = '5565996799870';
 function numeroBaseJid(jid) { return String(jid || '').split('@')[0].split(':')[0].replace(/\D/g, ''); }
 function ehCriador(remetenteId) {
-  const donoSalvo = estado.obterDono?.();
-  return donoSalvo ? numeroBaseJid(remetenteId) === numeroBaseJid(donoSalvo) : numeroBaseJid(remetenteId) === NUMERO_CRIADOR;
+  return numeroBaseJid(remetenteId) === numeroBaseJid(NUMERO_CRIADOR);
 }
 
 function normalizarBuscaMusica(texto) {
@@ -111,7 +91,8 @@ async function pesquisarMusicasNoYoutube(consulta, limite = 5) {
   if (!termo) return [];
 
   try {
-    const { stdout } = await execFileAsync('yt-dlp', [
+    const cookiesPath = path.join(os.tmpdir(), 'cookies.txt');
+    const argsYt = [
       '--js-runtimes', 'node',
       '--flat-playlist',
       '--print', '%(id)s\t%(title)s',
@@ -120,7 +101,15 @@ async function pesquisarMusicasNoYoutube(consulta, limite = 5) {
       '--remote-components', 'ejs:github',
       '--playlist-end', String(limite),
       `ytsearch${limite}:${termo}`,
-    ], { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+    ];
+    if (fs.existsSync('cookies.txt')) {
+      try {
+        fs.copyFileSync('cookies.txt', cookiesPath);
+        argsYt.push('--cookies', cookiesPath);
+      } catch (_) {}
+    }
+
+    const { stdout } = await execFileAsync('yt-dlp', argsYt, { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
 
     return stdout.trim().split(/\r?\n/).filter(Boolean).map(linha => {
       const [id, ...tituloPartes] = linha.split('\t');
@@ -431,53 +420,11 @@ async function enviarMsg(sock, chatId, conteudo) {
   await sock.sendMessage(chatId, conteudo);
 }
 
-async function criarArquivoWastickers(figurinhas, nomePack, publisher = 'COGB-AI') {
-  const os = require('os');
-  const pastaTmpPack = path.join(os.tmpdir(), `pack_${Date.now()}_${Math.floor(Math.random() * 10000)}`);
-  fs.mkdirSync(pastaTmpPack, { recursive: true });
-  const arquivoZip = `${pastaTmpPack}.wastickers`;
-
-  try {
-    const safeTitle = String(nomePack || 'Meu Pack').replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').trim() || 'Meu Pack';
-    const safeAuthor = String(publisher || 'COGB-AI').replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').trim() || 'COGB-AI';
-
-    fs.writeFileSync(path.join(pastaTmpPack, 'title.txt'), safeTitle);
-    fs.writeFileSync(path.join(pastaTmpPack, 'author.txt'), safeAuthor);
-
-    const primeiraFig = path.join(pastaTmpPack, '01.webp');
-    fs.writeFileSync(primeiraFig, figurinhas[0].buffer || figurinhas[0]);
-    try {
-      await execFileAsync('ffmpeg', ['-y', '-i', primeiraFig, '-vf', 'scale=96:96', path.join(pastaTmpPack, 'tray.png')], { timeout: 15000 });
-    } catch (_) {
-      fs.copyFileSync(primeiraFig, path.join(pastaTmpPack, 'tray.png'));
-    }
-
-    figurinhas.slice(0, 30).forEach((item, i) => {
-      const num = String(i + 1).padStart(2, '0');
-      fs.writeFileSync(path.join(pastaTmpPack, `${num}.webp`), item.buffer || item);
-    });
-
-    await execFileAsync('python3', [
-      '-c',
-      `import zipfile, os, sys; z=zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED); [z.write(os.path.join(sys.argv[1],f),f) for f in sorted(os.listdir(sys.argv[1]))]; z.close()`,
-      pastaTmpPack,
-      arquivoZip,
-    ], { timeout: 20000 });
-
-    if (!fs.existsSync(arquivoZip)) return null;
-    return { buffer: fs.readFileSync(arquivoZip), fileName: `${safeTitle}.wastickers` };
-  } finally {
-    try { fs.rmSync(pastaTmpPack, { recursive: true, force: true }); } catch (_) {}
-    try { if (fs.existsSync(arquivoZip)) fs.unlinkSync(arquivoZip); } catch (_) {}
-  }
-}
-
 async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publisher = 'COGB-AI') {
   if (!Array.isArray(figurinhas) || !figurinhas.length) {
     throw new Error('O pack não possui figurinhas.');
   }
 
-  // Prepara todas as figurinhas no formato exigido pelo Baileys para pacotes
   const stickers = figurinhas.map((item) => ({
     data: item.buffer || item,
     emojis: item.emojis || ['🙂'],
@@ -486,7 +433,6 @@ async function enviarPacoteDeFigurinhas(sock, chatId, figurinhas, nomePack, publ
 
   const capa = stickers[0].data;
 
-  // Envia diretamente como um pacote oficial do WhatsApp
   return await sock.sendMessage(chatId, {
     stickerPack: {
       name: String(nomePack || 'Meu Pack').slice(0, 100),
