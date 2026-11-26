@@ -92,6 +92,7 @@ async function pesquisarMusicasNoYoutube(consulta, limite = 5) {
 
   try {
     const cookiesPath = path.join(os.tmpdir(), 'cookies.txt');
+    const cacheDir = path.join(os.tmpdir(), 'yt-dlp-cache');
     const argsYt = [
       '--js-runtimes', 'node',
       '--flat-playlist',
@@ -99,6 +100,7 @@ async function pesquisarMusicasNoYoutube(consulta, limite = 5) {
       '--skip-download',
       '--force-ipv4',
       '--remote-components', 'ejs:github',
+      '--cache-dir', cacheDir,
       '--playlist-end', String(limite),
       `ytsearch${limite}:${termo}`,
     ];
@@ -109,7 +111,11 @@ async function pesquisarMusicasNoYoutube(consulta, limite = 5) {
       } catch (_) {}
     }
 
-    const { stdout } = await execFileAsync('yt-dlp', argsYt, { timeout: 60000, maxBuffer: 2 * 1024 * 1024 });
+    const { stdout } = await execFileAsync('yt-dlp', argsYt, { 
+      timeout: 60000, 
+      maxBuffer: 2 * 1024 * 1024,
+      env: { ...process.env, XDG_CACHE_HOME: os.tmpdir() }
+    });
 
     return stdout.trim().split(/\r?\n/).filter(Boolean).map(linha => {
       const [id, ...tituloPartes] = linha.split('\t');
