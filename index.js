@@ -3280,16 +3280,15 @@ Depois use */uno start* para começar.`,
         return;
       }
 
-      await enviarMsg(sock, chatId, { sticker: figurinha });
+     await enviarMsg(sock, chatId, { sticker: figurinha });
       return;
-        })();
-      } catch (erroMsg) {
-        console.error('⚠️ Erro isolado ao processar mensagem (bot mantido online):', erroMsg?.message || erroMsg);
-      } finally {
-        comandosEmExecucao = Math.max(0, comandosEmExecucao - 1);
-      }
     }
-  });
+  } catch (erroMsg) {
+    console.error('⚠️ Erro isolado ao processar mensagem (bot mantido online):', erroMsg?.message || erroMsg);
+  } finally {
+    comandosEmExecucao = Math.max(0, comandosEmExecucao - 1);
+  }
+});
 
   if (!global.__cogbRpgScheduler) {
     global.__cogbRpgScheduler = true;
